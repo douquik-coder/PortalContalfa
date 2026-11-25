@@ -182,14 +182,43 @@
     renderHome(); $('#p-home').classList.remove('hide');
   }
 
+  // Iconos de cada herramienta (trazos de 24 px)
+  const ICONS = {
+    ventas: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/><path d="M15 6l2 2 4-4"/>',
+    mayor: '<path d="M4 4h12l4 4v12H4z"/><path d="M8 10h8M8 14h8M8 18h5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    islr: '<rect x="4" y="2.5" width="16" height="19" rx="2"/><path d="M8 7h8M8 11h3M13 11h3M8 15h3M13 15h3M8 18.5h8"/>',
+    otherlevel: '<path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 6-7"/><path d="M16 6h4v4"/>',
+    eeff: '<path d="M12 3v9l7.5 4.3"/><circle cx="12" cy="12" r="9"/>',
+    atr: '<path d="M7 7h10l-3-3M17 17H7l3 3"/><rect x="2.5" y="9.5" width="7" height="5" rx="1"/><rect x="14.5" y="9.5" width="7" height="5" rx="1"/>',
+    honorarios: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8v3H8z"/><path d="M8.5 13h.01M12 13h.01M15.5 13h.01M8.5 16.5h.01M12 16.5h.01M15.5 16.5h.01"/>'
+  };
+  // Herramientas de la zona ejecutiva (supervisores y gerentes), mostradas aparte del resto
+  const EXEC = new Set(['honorarios']);
+  const DEF_ICON = '<path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/>';
+
   function renderHome() {
     const first = (Portal.profile.full_name || Portal.profile.username).split(' ')[0];
-    $('#hello').textContent = 'Hola, ' + first;
-    const list = Portal.tools.filter((t) => Portal.canUse(t.slug));
-    $('#no-tools').classList.toggle('hide', list.length > 0);
-    $('#tool-grid').innerHTML = list.map((t) => `<a class="tcard" href="#/h/${esc(t.slug)}">
-      <span class="cat">${esc(t.category)}</span><b>${esc(t.name)}</b><p>${esc(t.description)}</p>
-      <span class="badge ${t.cloud ? 'cloud' : ''}">${t.cloud ? '☁ Guardado en la nube' : 'Guarda en este equipo'}</span></a>`).join('');
+    $('#hello').innerHTML = 'Hola, <span class="grad">' + esc(first) + '</span>';
+    const all = Portal.tools.filter((t) => Portal.canUse(t.slug));
+    const exec = all.filter((t) => EXEC.has(t.slug));
+    const list = all.filter((t) => !EXEC.has(t.slug));
+    $('#no-tools').classList.toggle('hide', list.length > 0 || exec.length > 0);
+    $('#stat-tools').textContent = all.length;
+    $('#stat-cloud').textContent = all.filter((t) => t.cloud).length;
+    const now = new Date();
+    $('#stat-date').textContent = now.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' }).replace('.', '');
+    $('#stat-day').textContent = now.toLocaleDateString('es-VE', { weekday: 'long' });
+    const ico = (t) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[t.slug] || DEF_ICON}</svg>`;
+    $('#tool-grid').innerHTML = list.map((t, i) => `<a class="tcard" href="#/h/${esc(t.slug)}" style="--i:${i}">
+      <span class="tc-top"><span class="tc-ico">${ico(t)}</span><span class="cat">${esc(t.category)}</span></span>
+      <b>${esc(t.name)}</b><p>${esc(t.description)}</p>
+      <span class="tc-foot"><span class="badge ${t.cloud ? 'cloud' : ''}">${t.cloud ? '☁ Guardado en la nube' : 'Guarda en este equipo'}</span><span class="tc-go" aria-hidden="true">→</span></span></a>`).join('');
+    $('#exec-zone').classList.toggle('hide', !exec.length);
+    $('#home-body').classList.toggle('has-exec', exec.length > 0);
+    $('#exec-tools').innerHTML = exec.map((t) => `<a class="xcard" href="#/h/${esc(t.slug)}">
+      <span class="xc-ico">${ico(t)}</span>
+      <span class="xc-txt"><b>${esc(t.name)}</b><span>${esc(t.description)}</span></span>
+      <span class="xc-cta">Abrir <span aria-hidden="true">→</span></span></a>`).join('');
   }
 
   // ---------- herramienta abierta ----------

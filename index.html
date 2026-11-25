@@ -5,27 +5,46 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Portal Contalfa</title>
 <meta name="description" content="Herramientas de trabajo de Contalfa">
-<meta name="theme-color" content="#1d6c84">
+<meta name="theme-color" content="#06121c">
 <link rel="icon" type="image/png" href="/assets/icono.png">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="/assets/portal.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
 
 <!-- Cargando -->
-<div id="v-loading" class="center-screen"><div class="spinner" aria-label="Cargando"></div></div>
+<div id="v-loading" class="center-screen"><div class="loader" aria-label="Cargando"><img src="/assets/icono.png" alt=""><span></span></div></div>
 
 <!-- Inicio de sesión -->
-<div id="v-login" class="auth hide">
+<div id="v-login" class="auth split hide">
+  <section class="auth-hero">
+    <img src="/assets/logo-light.png" alt="Contalfa" class="hero-logo">
+    <span class="eyebrow"><i class="pulse"></i> Plataforma contable con inteligencia artificial</span>
+    <h1 class="hero-title">Contabilidad <span class="grad">inteligente</span>,<br>resultados en minutos.</h1>
+    <p class="hero-sub">Valida libros, revisa mayores, prepara el ISLR y genera estados financieros VEN-NIF con herramientas potenciadas por IA.</p>
+    <ul class="chips">
+      <li><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>Asistente IA</li>
+      <li><svg viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><path d="M12 3l8 3v6c0 4.5-3.4 8.4-8 9-4.6-.6-8-4.5-8-9V6z"/></svg>Acceso seguro</li>
+      <li><svg viewBox="0 0 24 24"><path d="M7 18a4.5 4.5 0 01-.6-9A6 6 0 0118 8.5a4.5 4.5 0 01-1 9.5z"/></svg>Guardado en la nube</li>
+    </ul>
+    <img src="/assets/hero-ia.svg" alt="" class="hero-art">
+  </section>
   <form class="auth-card" id="f-login" autocomplete="on">
-    <img src="/assets/logo.png" alt="Contalfa" class="auth-logo">
+    <img src="/assets/logo-light.png" alt="Contalfa" class="auth-logo">
+    <span class="card-kicker">Bienvenido</span>
     <h1>Portal de herramientas</h1>
     <p class="muted">Entra con tu usuario y clave.</p>
     <label>Usuario<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
     <label>Clave<input name="password" type="password" autocomplete="current-password" required></label>
     <div class="form-err" id="login-err" role="alert"></div>
-    <button class="btn primary block" type="submit">Entrar</button>
+    <button class="btn primary block glow" type="submit">Entrar</button>
+    <p class="secure-note"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Conexión cifrada · Contalfa</p>
     <p class="auth-foot hide" id="setup-link">¿Primera vez? <a href="#" id="go-setup">Activar la cuenta de administrador</a></p>
   </form>
 </div>
@@ -33,7 +52,7 @@
 <!-- Activación del administrador (solo la primera vez) -->
 <div id="v-setup" class="auth hide">
   <form class="auth-card" id="f-setup" autocomplete="off">
-    <img src="/assets/logo.png" alt="Contalfa" class="auth-logo">
+    <img src="/assets/logo-light.png" alt="Contalfa" class="auth-logo">
     <h1>Activar administrador</h1>
     <p class="muted">Esto se hace una sola vez. Usa el código de activación que te dio Claude.</p>
     <label>Código de activación<input name="code" required autocapitalize="characters" spellcheck="false"></label>
@@ -50,7 +69,7 @@
 <!-- Sin acceso -->
 <div id="v-denied" class="auth hide">
   <div class="auth-card">
-    <img src="/assets/logo.png" alt="Contalfa" class="auth-logo">
+    <img src="/assets/logo-light.png" alt="Contalfa" class="auth-logo">
     <h1>Sin acceso</h1>
     <p class="muted" id="denied-msg">Tu usuario no está activo. Habla con el administrador.</p>
     <button class="btn block" data-logout>Cerrar sesión</button>
@@ -60,11 +79,12 @@
 <!-- Aplicación -->
 <div id="v-app" class="hide">
   <header class="top">
-    <a href="#/" class="brand" aria-label="Inicio"><img src="/assets/logo.png" alt="Contalfa"></a>
+    <a href="#/" class="brand" aria-label="Inicio"><img src="/assets/logo-light.png" alt="Contalfa"></a>
     <nav class="nav">
-      <a href="#/" data-nav="home">Herramientas</a>
-      <a href="#/admin" data-nav="admin" class="hide" id="nav-admin">Administración</a>
+      <a href="#/" data-nav="home"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Herramientas</span></a>
+      <a href="#/admin" data-nav="admin" class="hide" id="nav-admin"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M17 11l1.2 1.2L21 9.5"/></svg><span>Administración</span></a>
     </nav>
+    <span class="ai-status" title="Herramientas con inteligencia artificial"><i class="pulse"></i>IA en línea</span>
     <div class="who">
       <span class="who-name" id="who-name"></span>
       <button class="btn ghost sm" data-logout>Salir</button>
@@ -74,10 +94,35 @@
   <!-- Menú de herramientas -->
   <main id="p-home" class="page">
     <div class="wrap">
-      <h2 class="hello" id="hello"></h2>
-      <p class="muted">Estas son las herramientas que tienes activas. Siempre abres la última versión.</p>
-      <div class="grid" id="tool-grid"></div>
-      <div class="empty hide" id="no-tools">Todavía no tienes herramientas activas. Pídele al administrador que te las active.</div>
+      <section class="home-hero">
+        <div class="hh-text">
+          <span class="eyebrow"><i class="pulse"></i> Centro de herramientas contables con IA</span>
+          <h2 class="hello" id="hello"></h2>
+          <p class="hh-sub">Estas son las herramientas que tienes activas. Siempre abres la última versión, y tu trabajo se guarda mientras avanzas.</p>
+          <div class="stats">
+            <div class="stat"><b id="stat-tools">0</b><span>herramientas activas</span></div>
+            <div class="stat"><b id="stat-cloud">0</b><span>con guardado en la nube</span></div>
+            <div class="stat"><b id="stat-date">·</b><span id="stat-day">hoy</span></div>
+          </div>
+        </div>
+        <img src="/assets/hero-ia.svg" alt="" class="hh-art">
+      </section>
+      <div class="home-body" id="home-body">
+        <div class="hb-main">
+          <div class="sec-head"><h3>Herramientas de análisis</h3><span class="line"></span></div>
+          <div class="grid" id="tool-grid"></div>
+          <div class="empty hide" id="no-tools">Todavía no tienes herramientas activas. Pídele al administrador que te las active.</div>
+        </div>
+        <aside class="exec hide" id="exec-zone" aria-label="Zona ejecutiva">
+          <div class="exec-head">
+            <span class="exec-badge"><svg viewBox="0 0 24 24"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg>Zona ejecutiva</span>
+            <h3>Dirección y gerencia</h3>
+            <p>Herramientas de decisión para supervisores y gerentes: cotiza, fija honorarios y define el alcance de cada cliente.</p>
+          </div>
+          <div id="exec-tools" class="exec-tools"></div>
+          <p class="exec-foot"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Acceso reservado. La activa el administrador.</p>
+        </aside>
+      </div>
     </div>
   </main>
 
@@ -101,6 +146,7 @@
     <div class="wrap">
       <div class="admin-head">
         <div>
+          <span class="eyebrow"><i class="pulse"></i> Panel de control</span>
           <h2>Administración</h2>
           <p class="muted">Crea usuarios y activa o desactiva cada herramienta por analista. Los cambios se aplican al instante.</p>
         </div>
@@ -149,5 +195,6 @@
 
 <script src="/assets/config.js"></script>
 <script src="/assets/portal.js"></script>
+<script src="/assets/fx.js"></script>
 </body>
 </html>
