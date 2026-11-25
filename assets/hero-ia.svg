@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 470" fill="none" font-family="system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#29c4f0"/><stop offset=".55" stop-color="#1d8fae"/><stop offset="1" stop-color="#8dc63f"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#29abe2"/><stop offset="1" stop-color="#8dc63f"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".13"/><stop offset="1" stop-color="#ffffff" stop-opacity=".03"/>
+    </linearGradient>
+    <radialGradient id="halo" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#29c4f0" stop-opacity=".55"/><stop offset=".45" stop-color="#1d8fae" stop-opacity=".18"/><stop offset="1" stop-color="#0a1c2a" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1.2" fill="#6fd6f5" fill-opacity=".18"/></pattern>
+  </defs>
+
+  <rect x="20" y="20" width="520" height="430" rx="30" fill="url(#dots)"/>
+  <circle cx="280" cy="235" r="190" fill="url(#halo)"/>
+  <circle cx="280" cy="235" r="150" stroke="#29c4f0" stroke-opacity=".18" stroke-dasharray="2 8"/>
+  <circle cx="280" cy="235" r="112" stroke="#8dc63f" stroke-opacity=".22" stroke-dasharray="40 14">
+    <animateTransform attributeName="transform" type="rotate" from="0 280 235" to="360 280 235" dur="40s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- pistas de circuito -->
+  <g stroke="url(#g1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".75">
+    <path d="M230 205 H190 V120 H160"/>
+    <path d="M230 265 H185 V340 H160"/>
+    <path d="M330 205 H372 V112 H400"/>
+    <path d="M330 265 H378 V350 H400"/>
+    <path d="M265 185 V150"/><path d="M295 185 V150"/>
+    <path d="M265 285 V320"/><path d="M295 285 V320"/>
+  </g>
+  <g stroke="#bff3ff" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 120">
+    <path d="M230 205 H190 V120 H160"><animate attributeName="stroke-dashoffset" from="0" to="-126" dur="2.4s" repeatCount="indefinite"/></path>
+    <path d="M230 265 H185 V340 H160"><animate attributeName="stroke-dashoffset" from="-40" to="-166" dur="2.8s" repeatCount="indefinite"/></path>
+    <path d="M330 205 H372 V112 H400"><animate attributeName="stroke-dashoffset" from="-20" to="-146" dur="2.2s" repeatCount="indefinite"/></path>
+    <path d="M330 265 H378 V350 H400"><animate attributeName="stroke-dashoffset" from="-70" to="-196" dur="3s" repeatCount="indefinite"/></path>
+  </g>
+
+  <!-- chip de IA -->
+  <rect x="222" y="177" width="116" height="116" rx="24" fill="url(#g1)" filter="url(#blur)" opacity=".55"/>
+  <rect x="230" y="185" width="100" height="100" rx="20" fill="#0b2333" stroke="url(#g1)" stroke-width="3"/>
+  <rect x="244" y="199" width="72" height="72" rx="12" fill="#0f3346" stroke="#6fd6f5" stroke-opacity=".35"/>
+  <text x="280" y="246" text-anchor="middle" font-size="30" font-weight="800" fill="url(#g2)" letter-spacing="1">IA</text>
+  <g fill="#6fd6f5"><circle cx="265" cy="150" r="4"/><circle cx="295" cy="150" r="4"/><circle cx="265" cy="320" r="4"/><circle cx="295" cy="320" r="4"/></g>
+  <circle cx="280" cy="235" r="56" stroke="#6fd6f5" stroke-opacity=".5">
+    <animate attributeName="r" values="56;92" dur="2.6s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-opacity" values=".5;0" dur="2.6s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- tarjeta: libro de ventas (barras) -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="0 0;0 -6;0 0" dur="6s" repeatCount="indefinite"/>
+    <rect x="30" y="62" width="130" height="112" rx="16" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".18"/>
+    <text x="46" y="86" font-size="11" font-weight="700" fill="#9fdcef" letter-spacing="1">VENTAS</text>
+    <g fill="url(#g2)">
+      <rect x="48" y="126" width="12" height="32" rx="3"/><rect x="68" y="112" width="12" height="46" rx="3"/>
+      <rect x="88" y="120" width="12" height="38" rx="3"/><rect x="108" y="100" width="12" height="58" rx="3"/>
+      <rect x="128" y="94" width="12" height="64" rx="3"/>
+    </g>
+  </g>
+
+  <!-- tarjeta: mayor (filas con check) -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="0 0;0 7;0 0" dur="7s" repeatCount="indefinite"/>
+    <rect x="22" y="290" width="140" height="120" rx="16" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".18"/>
+    <text x="38" y="314" font-size="11" font-weight="700" fill="#9fdcef" letter-spacing="1">MAYOR</text>
+    <g stroke="#ffffff" stroke-opacity=".35" stroke-width="5" stroke-linecap="round">
+      <path d="M40 334 H112"/><path d="M40 356 H100"/><path d="M40 378 H116"/>
+    </g>
+    <g stroke="#8dc63f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M128 334 l4 4 8 -8"/><path d="M128 356 l4 4 8 -8"/><path d="M128 378 l4 4 8 -8"/>
+    </g>
+  </g>
+
+  <!-- tarjeta: ISLR (dona) -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="0 0;0 -7;0 0" dur="6.5s" repeatCount="indefinite"/>
+    <rect x="400" y="52" width="136" height="122" rx="16" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".18"/>
+    <text x="416" y="76" font-size="11" font-weight="700" fill="#9fdcef" letter-spacing="1">ISLR</text>
+    <circle cx="468" cy="124" r="30" stroke="#ffffff" stroke-opacity=".12" stroke-width="11"/>
+    <circle cx="468" cy="124" r="30" stroke="url(#g1)" stroke-width="11" stroke-dasharray="132 189" transform="rotate(-90 468 124)" stroke-linecap="round"/>
+    <text x="468" y="129" text-anchor="middle" font-size="14" font-weight="800" fill="#ffffff">70%</text>
+  </g>
+
+  <!-- tarjeta: EEFF (línea) -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="0 0;0 6;0 0" dur="7.5s" repeatCount="indefinite"/>
+    <rect x="400" y="296" width="140" height="116" rx="16" fill="url(#glass)" stroke="#ffffff" stroke-opacity=".18"/>
+    <text x="416" y="320" font-size="11" font-weight="700" fill="#9fdcef" letter-spacing="1">BALANCE</text>
+    <path d="M416 392 L440 372 L462 380 L486 352 L508 360 L524 336" stroke="url(#g1)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M416 392 L440 372 L462 380 L486 352 L508 360 L524 336 V398 H416 Z" fill="url(#g1)" opacity=".16"/>
+    <circle cx="524" cy="336" r="4.5" fill="#8dc63f"/>
+  </g>
+
+  <!-- cifras flotantes -->
+  <g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#6fd6f5" fill-opacity=".55">
+    <text x="196" y="70">Bs. 1.248.300,00</text>
+    <text x="300" y="440">IVA 16% ✓</text>
+    <text x="180" y="440">Σ Debe = Haber</text>
+    <text x="318" y="40">VEN-NIF</text>
+  </g>
+</svg>
