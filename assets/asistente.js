@@ -6,6 +6,7 @@
   'use strict';
   const Portal = window.Portal;
   if (!Portal) return;
+  const enEspanol = window.enEspanol || ((x) => (x && x.message) || String(x));
   const C = window.PORTAL_CONFIG;
 
   // ======================= utilidades =======================
@@ -227,7 +228,7 @@
     try { wb = X.read(buf, { type: 'array', cellDates: false, cellNF: false, cellText: false }); }
     catch (e) {
       if (/password|encrypt/i.test(e.message)) throw Object.assign(new Error('El archivo está protegido con clave. Ábrelo en Excel, quita la clave y vuelve a guardarlo.'), { code: 'pwd' });
-      throw Object.assign(new Error('No se pudo leer el archivo: parece dañado o no es de Excel (' + e.message + ').'), { code: 'bad' });
+      throw Object.assign(new Error('No se pudo leer el archivo: parece dañado o no es de Excel (' + enEspanol(e) + ').'), { code: 'bad' });
     }
     const sheets = wb.SheetNames.map((n) => {
       const ws = wb.Sheets[n];
@@ -304,7 +305,7 @@
     }
     const data = rows.filter((r) => r && toDate(r[0], 'dmy_strict'));
     const width = Math.max(0, ...rows.map((r) => (r || []).length));
-    return data.length > 0 && width >= 25;
+    return data.length > 0 && width >= 25 ? 'sinTitulos' : false;
   }
   const ACCEPT = { modulo: acceptsModulo, mayor: acceptsMayor, bc: acceptsBC, ventas: acceptsVentas };
 
@@ -671,7 +672,7 @@
     try { book = await readBook(file); }
     catch (e) {
       if (slot.onlyIfLooksLike && (e.code === 'pdf' || e.code === 'img')) return Object.assign(ana, { status: 'pass' });
-      return Object.assign(ana, { status: 'block', reason: `«${file.name}»: ${e.message}` });
+      return Object.assign(ana, { status: 'block', reason: `«${file.name}»: ${enEspanol(e)}` });
     }
     ana.book = book;
     const sheets = book.sheets.filter((s) => s.rows.some((r) => r.some((c) => !blank(c))));
@@ -683,7 +684,7 @@
     }
     ana.sheets = sheets;
     // ¿Alguna hoja ya está en el formato que la herramienta acepta?
-    for (const k of slot.docs) for (const s of sheets) if (ACCEPT[k](s.rows, slot)) { ana.accepted = { docType: k, sheet: s }; break; }
+    for (const k of slot.docs) for (const s of sheets) { const how = ACCEPT[k](s.rows, slot); if (how) { ana.accepted = { docType: k, sheet: s, how }; break; } }
     // Elegir documento y hoja más probables
     let best = null;
     for (const s of sheets) {
@@ -706,6 +707,9 @@
     recompute(ana);
     const serious = ana.checks.filter((c) => c.sev === 'bad' || c.sev === 'warn');
     if (ana.accepted && !serious.length) return Object.assign(ana, { status: 'pass' });
+    // Libro de ventas sin fila de títulos (formato del sistema, 33+ columnas): el Validador lo reconoce por posición
+    // y tiene su propia revisión detallada; el asistente no lo interrumpe salvo que parezca otro documento.
+    if (ana.accepted && ana.accepted.how === 'sinTitulos' && !ana.other && !ana.wrongDoc) return Object.assign(ana, { status: 'pass' });
     if (ana.accepted) return Object.assign(ana, { status: 'review' });
     if (ana.profile && !serious.length && ana.complete) return Object.assign(ana, { status: 'auto' });
     return Object.assign(ana, { status: 'fix' });
@@ -835,10 +839,10 @@
           try {
             const f = await toFile(ana, buildAoA(ana, ana.ex));
             const sv = $('#as-save');
-            if (sv && sv.checked) { const nm = ($('#as-pname').value || '').trim() || defaultName(); try { await saveProfile(ana, nm); Portal.toast && Portal.toast('Formato «' + nm + '» guardado para toda la firma'); } catch (e) { Portal.toast && Portal.toast('No se pudo guardar el formato: ' + e.message); } }
+            if (sv && sv.checked) { const nm = ($('#as-pname').value || '').trim() || defaultName(); try { await saveProfile(ana, nm); Portal.toast && Portal.toast('Formato «' + nm + '» guardado para toda la firma'); } catch (e) { Portal.toast && Portal.toast('No se pudo guardar el formato: ' + enEspanol(e)); } }
             else if (ana.profile) touchProfile(ana.profile);
             done(f);
-          } catch (e) { b.disabled = false; alert('No se pudo preparar el archivo: ' + e.message); }
+          } catch (e) { b.disabled = false; alert('No se pudo preparar el archivo: ' + enEspanol(e)); }
         };
       };
       const applyAI = (force) => {
@@ -870,7 +874,7 @@
       function runAI() {
         aiBusy = true; aiErr = ''; render();
         askAI(ana, ana.sheets).then((res) => { ai = res; aiBusy = false; const before = ana.complete; applyAI(false); recompute(ana); if (!before && ana.complete) ai.explicacion = (ai.explicacion || '') + ' Ya completé las columnas con su sugerencia; revísalas.'; render(); })
-          .catch((e) => { aiBusy = false; aiErr = e.message; render(); });
+          .catch((e) => { aiBusy = false; aiErr = enEspanol(e); render(); });
       }
       if ((ana.status === 'fix' && !ana.complete) || ana.other || ana.wrongDoc) runAI();
     });

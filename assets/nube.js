@@ -28,6 +28,7 @@
 
   // ---------- estado visible ----------
   let statusFn = () => {};
+  const enEspanol = window.enEspanol || ((x) => (x && x.message) || String(x));
   const status = (t, bad) => { try { statusFn(t, bad); if (Portal.cloudStatus) Portal.cloudStatus(t, bad); } catch (e) {} };
 
   // =====================================================================
@@ -216,7 +217,7 @@
             const blob = new Blob(parts, { type: /\.json$/i.test(name) ? 'application/json' : 'application/octet-stream' });
             status('☁ Guardando…');
             const { error } = await sb.storage.from(BUCKET).upload(path(), blob, { upsert: true, contentType: blob.type });
-            if (error) { status('⚠ No se pudo guardar en la nube: ' + error.message, true); throw error; }
+            if (error) { status('⚠ No se pudo guardar en la nube: ' + enEspanol(error), true); throw error; }
             exists = true; invalidate(path()); status('☁ Guardado en la nube');
           }
         };
@@ -242,7 +243,7 @@
         status('☁ Guardando…');
         const p = dirP(store) + '/' + encSeg(id) + '.json';
         const { error } = await sb.storage.from(BUCKET).upload(p, new Blob([text], { type: 'application/json' }), { upsert: true, contentType: 'application/json' });
-        if (error) { status('⚠ No se pudo guardar en la nube: ' + error.message, true); throw error; }
+        if (error) { status('⚠ No se pudo guardar en la nube: ' + enEspanol(error), true); throw error; }
         invalidate(p); status('☁ Guardado en la nube');
       },
       async del(store, id) { const p = dirP(store) + '/' + encSeg(id) + '.json'; await sb.storage.from(BUCKET).remove([p]); invalidate(p); }

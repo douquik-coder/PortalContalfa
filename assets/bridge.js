@@ -175,6 +175,32 @@
     }, true);
   }
 
+  // Todo en español: los mensajes técnicos en inglés que muestre la herramienta se traducen al vuelo.
+  var es = null; try { es = window.parent.enEspanol || null; } catch (e) {}
+  if (es) {
+    ['alert', 'confirm', 'prompt'].forEach(function (fn) {
+      var orig = window[fn];
+      if (typeof orig === 'function') window[fn] = function (m) { var a = Array.prototype.slice.call(arguments); a[0] = es(m); return orig.apply(window, a); };
+    });
+    var fix = function (node) {
+      if (node.nodeType === 3) { var t = node.nodeValue; if (t && es.huele(t)) { var n = es(t); if (n !== t) node.nodeValue = n; } return; }
+      if (node.nodeType !== 1 || /^(SCRIPT|STYLE|TEXTAREA|INPUT)$/.test(node.nodeName)) return;
+      var w = document.createTreeWalker(node, 4), x; while ((x = w.nextNode())) fix(x);
+      if (node.title && es.huele(node.title)) node.title = es(node.title);
+    };
+    var start = function () {
+      fix(document.body);
+      new MutationObserver(function (ms) { ms.forEach(function (m) { if (m.type === 'characterData') fix(m.target); else m.addedNodes.forEach(fix); }); })
+        .observe(document.body, { childList: true, subtree: true, characterData: true });
+    };
+    if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+    // Un fallo inesperado de la herramienta se avisa en español en vez de quedar oculto en la consola
+    var last = 0;
+    var avisar = function (m) { var now = Date.now(); if (now - last < 4000) return; last = now; try { P.toast('La herramienta tuvo un problema: ' + es(m) + '. Si se repite, avísale a Douglas con una captura.'); } catch (e) {} };
+    window.addEventListener('error', function (e) { if (e && e.message && !/ResizeObserver|Script error/i.test(e.message)) avisar(e.message); });
+    window.addEventListener('unhandledrejection', function (e) { var r = e && e.reason; if (r && (r.message || typeof r === 'string')) avisar(r.message || r); });
+  }
+
   // Aviso al portal cuando cambia el trabajo (lo usan las herramientas con guardado automático)
   window.addEventListener('portal:change', function () { try { P.onToolChange(slug); } catch (e) {} });
 })();

@@ -16,7 +16,7 @@
 
   // ---------- utilidades ----------
   function show(v) { ['loading', 'login', 'setup', 'denied', 'app'].forEach((x) => $('#v-' + x).classList.toggle('hide', x !== v)); }
-  function toast(t) { const d = $('#toast'); d.textContent = t; d.classList.add('show'); clearTimeout(d._t); d._t = setTimeout(() => d.classList.remove('show'), 3800); }
+  function toast(t) { const d = $('#toast'); d.textContent = window.enEspanol ? enEspanol(t) : t; d.classList.add('show'); clearTimeout(d._t); d._t = setTimeout(() => d.classList.remove('show'), 3800); }
   const chk = (r) => { if (r.error) throw r.error; return r.data; };
 
   async function adminFn(body) {
@@ -51,14 +51,15 @@
     toolHasCloudDb(slug) { return slug === 'ventas' && this.canUse(slug); },
     makeDb(slug) { return makeDb(slug); },
     onToolChange(slug) { if (cur.slug === slug && cur.snapshot) markDirty(); },
-    toast(t) { toast(t); }
+    toast(t) { toast(t); },
+    enEspanol: (m) => (window.enEspanol ? window.enEspanol(m) : m)
   };
 
   // Base de datos tipo "colecciones y documentos" que usa el Validador de libro de ventas, guardada por usuario.
   function makeDb(slug) {
     const uid = Portal.user.id;
     const t = () => sb.from('tool_docs');
-    const fail = (e) => { throw { code: e.code || 'db', message: e.message || 'No se pudo leer o guardar en la nube.' }; };
+    const fail = (e) => { throw { code: e.code || 'db', message: (window.enEspanol ? enEspanol(e.message) : e.message) || 'No se pudo leer o guardar en la nube.' }; };
     const coll = (name, filters) => ({
       doc: (id) => ({
         id,
@@ -116,7 +117,7 @@
       }
       f.password.value = '';
       await enter(data.user);
-    } catch (e) { err.textContent = e.message; }
+    } catch (e) { err.textContent = enEspanol(e); }
     finally { btn.disabled = false; btn.textContent = 'Entrar'; }
   });
 
@@ -136,7 +137,7 @@
       await enter(data.user);
       toast('Administrador creado. Ya puedes crear a los analistas.');
       location.hash = '#/admin';
-    } catch (e) { err.textContent = e.message; }
+    } catch (e) { err.textContent = enEspanol(e); }
     finally { btn.disabled = false; }
   });
 
@@ -368,7 +369,7 @@
         try { chk(await sb.from('saved_work').delete().eq('id', b.dataset.del)); if (cur.workId === b.dataset.del) { cur.workId = null; cur.title = null; } b.closest('.work').remove(); }
         catch (e) { toast('No se pudo eliminar: ' + e.message); }
       });
-    } catch (e) { box.innerHTML = '<p class="form-err">No se pudo leer la lista: ' + esc(e.message) + '</p>'; }
+    } catch (e) { box.innerHTML = '<p class="form-err">No se pudo leer la lista: ' + esc(enEspanol(e)) + '</p>'; }
   });
   $$('[data-close]').forEach((b) => b.addEventListener('click', () => b.closest('dialog').close()));
 
@@ -384,7 +385,7 @@
       ]);
       adm.users = chk(u); adm.access = chk(a);
       renderMatrix();
-    } catch (e) { m.innerHTML = '<tr><td class="form-err">No se pudo cargar: ' + esc(e.message) + '</td></tr>'; }
+    } catch (e) { m.innerHTML = '<tr><td class="form-err">No se pudo cargar: ' + esc(enEspanol(e)) + '</td></tr>'; }
   }
 
   function renderMatrix() {
@@ -446,7 +447,7 @@
       $('#dlg-user').close();
       toast('Analista creado. Pásale su usuario y clave.');
       loadAdmin();
-    } catch (e) { $('#user-err').textContent = e.message; }
+    } catch (e) { $('#user-err').textContent = enEspanol(e); }
     finally { btn.disabled = false; }
   });
 
@@ -455,7 +456,7 @@
     ev.preventDefault();
     const d = $('#dlg-pass');
     try { await adminFn({ action: 'set_password', user_id: d.dataset.u, password: ev.target.password.value }); d.close(); toast('Clave cambiada'); }
-    catch (e) { $('#pass-err').textContent = e.message; }
+    catch (e) { $('#pass-err').textContent = enEspanol(e); }
   });
 
   // ---------- arranque ----------
