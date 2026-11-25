@@ -45,6 +45,7 @@
     <div class="form-err" id="login-err" role="alert"></div>
     <button class="btn primary block glow" type="submit">Entrar</button>
     <p class="secure-note"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Conexión cifrada · Contalfa</p>
+    <p class="auth-foot hide" id="signup-link">¿Trabajas en Contalfa? <a href="#" id="go-signup">Regístrate con el código de la firma</a></p>
     <p class="auth-foot hide" id="setup-link">¿Primera vez? <a href="#" id="go-setup">Activar la cuenta de administrador</a></p>
   </form>
 </div>
@@ -63,6 +64,26 @@
     <div class="form-err" id="setup-err" role="alert"></div>
     <button class="btn primary block" type="submit">Crear administrador</button>
     <p class="auth-foot"><a href="#" id="back-login">Volver a iniciar sesión</a></p>
+  </form>
+</div>
+
+<!-- Registro propio con el código de la firma -->
+<div id="v-signup" class="auth hide">
+  <form class="auth-card" id="f-signup" autocomplete="off">
+    <img src="/assets/logo-light.png" alt="Contalfa" class="auth-logo">
+    <span class="card-kicker">Nuevo usuario</span>
+    <h1>Regístrate</h1>
+    <p class="muted">Escribe el código que te dio Contalfa y crea tu usuario. Luego eliges las herramientas que vas a usar.</p>
+    <label>Código de la firma<input name="code" required autocapitalize="characters" spellcheck="false" placeholder="Te lo da tu supervisor"></label>
+    <label>Nombre y apellido<input name="full_name" required minlength="3" autocomplete="name"></label>
+    <label>Departamento<input name="departamento" list="deptos" placeholder="Ej. Contabilidad"></label>
+    <datalist id="deptos"><option>Contabilidad</option><option>Auditoría</option><option>Impuestos</option><option>Nómina</option><option>Administración</option><option>Consultoría</option></datalist>
+    <label>Usuario (para entrar)<input name="username" required autocapitalize="none" spellcheck="false" placeholder="nombre.apellido" pattern="[a-zA-Z0-9._\-]{3,30}" title="De 3 a 30 letras, números, punto o guion, sin espacios"></label>
+    <label>Clave (mínimo 8 caracteres)<input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+    <label>Repite la clave<input name="password2" type="password" minlength="8" autocomplete="new-password" required></label>
+    <div class="form-err" id="signup-err" role="alert"></div>
+    <button class="btn primary block glow" type="submit">Crear mi usuario</button>
+    <p class="auth-foot"><a href="#" id="signup-back">Ya tengo usuario: iniciar sesión</a></p>
   </form>
 </div>
 
@@ -109,7 +130,7 @@
       </section>
       <div class="home-body" id="home-body">
         <div class="hb-main">
-          <div class="sec-head"><h3>Herramientas de análisis</h3><span class="line"></span></div>
+          <div class="sec-head"><h3>Herramientas de análisis</h3><span class="line"></span><button class="btn sm ghost hide" id="btn-pick">Elegir mis herramientas</button></div>
           <div class="grid" id="tool-grid"></div>
           <div class="empty hide" id="no-tools">Todavía no tienes herramientas activas. Pídele al administrador que te las active.</div>
         </div>
@@ -152,10 +173,22 @@
         </div>
         <button class="btn primary" id="btn-add-user">+ Nuevo analista</button>
       </div>
+      <div class="card signup-card hide" id="signup-card">
+        <div class="sc-txt">
+          <b>Registro con código</b>
+          <span class="muted">Quien tenga este código puede crear su propio usuario desde la página de inicio y elegir sus herramientas. Cámbialo cuando quieras; el anterior deja de servir al instante.</span>
+        </div>
+        <form id="f-signupcfg" class="sc-form">
+          <label class="switch"><input type="checkbox" name="enabled"> <span>Registro abierto</span></label>
+          <label>Código<input name="code" required autocapitalize="characters" spellcheck="false" minlength="6" maxlength="30"></label>
+          <button class="btn primary sm" type="submit">Guardar</button>
+          <span class="muted" id="signupcfg-st"></span>
+        </form>
+      </div>
       <div class="card">
         <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
       </div>
-      <p class="note">El administrador tiene todas las herramientas. Un analista desactivado no puede entrar al portal; su trabajo guardado se conserva.</p>
+      <p class="note" id="admin-note">El administrador tiene todas las herramientas. Un analista desactivado no puede entrar al portal; su trabajo guardado se conserva.</p>
     </div>
   </main>
 </div>
@@ -167,9 +200,22 @@
     <label>Nombre<input name="full_name" required></label>
     <label>Usuario<input name="username" required autocapitalize="none" spellcheck="false" placeholder="maria"></label>
     <label>Clave inicial (mínimo 8 caracteres)<input name="password" minlength="8" required autocomplete="new-password"></label>
+    <label>Departamento<input name="departamento" list="deptos" placeholder="Ej. Contabilidad"></label>
+    <div class="row2 adm-only"><label>Rol<select name="role"><option value="analista">Analista</option><option value="supervisor">Supervisor</option></select></label>
+    <label>Supervisor<select name="supervisor_id" id="user-sup"></select></label></div>
     <fieldset class="checks" id="user-tools"><legend>Herramientas activas</legend></fieldset>
     <div class="form-err" id="user-err"></div>
     <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" id="user-save" value="ok">Crear</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-pick" class="dlg wide">
+  <form method="dialog" id="f-pick">
+    <h3>Elige tus herramientas</h3>
+    <p class="muted">Lee de qué trata cada una y marca las que vas a usar. Puedes cambiarlo cuando quieras con «Elegir mis herramientas».</p>
+    <div class="pick-list" id="pick-list"></div>
+    <div class="form-err" id="pick-err"></div>
+    <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Después</button><button class="btn primary" id="pick-save" value="ok">Guardar mi selección</button></div>
   </form>
 </dialog>
 

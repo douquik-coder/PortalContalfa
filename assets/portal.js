@@ -15,7 +15,7 @@
   });
 
   // ---------- utilidades ----------
-  function show(v) { ['loading', 'login', 'setup', 'denied', 'app'].forEach((x) => $('#v-' + x).classList.toggle('hide', x !== v)); }
+  function show(v) { ['loading', 'login', 'setup', 'signup', 'denied', 'app'].forEach((x) => $('#v-' + x).classList.toggle('hide', x !== v)); }
   function toast(t) { const d = $('#toast'); d.textContent = window.enEspanol ? enEspanol(t) : t; d.classList.add('show'); clearTimeout(d._t); d._t = setTimeout(() => d.classList.remove('show'), 3800); }
   const chk = (r) => { if (r.error) throw r.error; return r.data; };
 
@@ -102,7 +102,29 @@
     show('login');
     setTimeout(() => $('#f-login [name=username]').focus(), 50);
     try { const s = await adminFn({ action: 'status' }); $('#setup-link').classList.toggle('hide', !s.needsSetup); } catch (e) { /* sin conexión al servicio */ }
+    try { const s = await adminFn({ action: 'signup_info' }); $('#signup-link').classList.toggle('hide', !s.enabled); } catch (e) { /* sin conexión al servicio */ }
   }
+
+  // ---------- registro propio con el código de la firma ----------
+  $('#go-signup').addEventListener('click', (e) => { e.preventDefault(); $('#signup-err').textContent = ''; show('signup'); setTimeout(() => $('#f-signup [name=code]').focus(), 50); });
+  $('#signup-back').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
+  $('#f-signup').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const f = ev.target, err = $('#signup-err'), btn = $('button[type=submit]', f);
+    err.textContent = '';
+    if (f.password.value !== f.password2.value) { err.textContent = 'Las claves no coinciden.'; return; }
+    btn.disabled = true; btn.textContent = 'Creando…';
+    try {
+      const username = f.username.value.trim().toLowerCase();
+      await adminFn({ action: 'signup', code: f.code.value, full_name: f.full_name.value, departamento: f.departamento.value, username, password: f.password.value });
+      const { data, error } = await sb.auth.signInWithPassword({ email: toEmail(username), password: f.password.value });
+      if (error) throw error;
+      f.reset();
+      await enter(data.user);
+      toast('¡Listo! Tu usuario es «' + username + '». Ahora elige tus herramientas.');
+    } catch (e) { err.textContent = enEspanol(e); }
+    finally { btn.disabled = false; btn.textContent = 'Crear mi usuario'; }
+  });
 
   $('#f-login').addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -165,9 +187,14 @@
     Portal.tools = tools.data || [];
     Portal.access = new Set(prof.data.role === 'admin' ? Portal.tools.map((t) => t.slug) : (acc.data || []).map((a) => a.tool_slug));
     $('#who-name').textContent = prof.data.full_name || prof.data.username;
-    $('#nav-admin').classList.toggle('hide', prof.data.role !== 'admin');
+    const staff = prof.data.role === 'admin' || prof.data.role === 'supervisor';
+    $('#nav-admin').classList.toggle('hide', !staff);
+    $('#nav-admin span').textContent = prof.data.role === 'supervisor' ? 'Mi equipo' : 'Administración';
+    Portal.selfService = prof.data.origen === 'registro';
+    $('#btn-pick').classList.toggle('hide', !Portal.selfService);
     show('app');
     route();
+    if (Portal.selfService && !Portal.access.size) openPicker();
   }
 
   // ---------- navegación ----------
@@ -179,7 +206,7 @@
     $$('.page').forEach((p) => p.classList.add('hide'));
     $$('[data-nav]').forEach((a) => a.classList.toggle('on', a.dataset.nav === (page === 'admin' ? 'admin' : 'home')));
     if (page === 'h' && arg && Portal.canUse(arg)) { if (cur.slug !== arg) openTool(arg); $('#p-tool').classList.remove('hide'); return; }
-    if (page === 'admin' && Portal.profile.role === 'admin') { $('#p-admin').classList.remove('hide'); loadAdmin(); return; }
+    if (page === 'admin' && (Portal.profile.role === 'admin' || Portal.profile.role === 'supervisor')) { $('#p-admin').classList.remove('hide'); loadAdmin(); return; }
     if (page) { history.replaceState(null, '', '#/'); }
     renderHome(); $('#p-home').classList.remove('hide');
   }
@@ -205,6 +232,8 @@
     const exec = all.filter((t) => EXEC.has(t.slug));
     const list = all.filter((t) => !EXEC.has(t.slug));
     $('#no-tools').classList.toggle('hide', list.length > 0 || exec.length > 0);
+    $('#no-tools').textContent = Portal.selfService ? 'Todavía no elegiste herramientas. Toca «Elegir mis herramientas» y marca las que vas a usar.'
+      : 'Todavía no tienes herramientas activas. Pídele al administrador o a tu supervisor que te las active.';
     $('#stat-tools').textContent = all.length;
     $('#stat-cloud').textContent = all.length;
     const now = new Date();
@@ -222,6 +251,32 @@
       <span class="xc-txt"><b>${esc(t.name)}</b><span>${esc(t.description)}</span></span>
       <span class="xc-cta">Abrir <span aria-hidden="true">→</span></span></a>`).join('');
   }
+
+  // ---------- el usuario elige sus herramientas (registro propio) ----------
+  function openPicker() {
+    $('#pick-err').textContent = '';
+    $('#pick-list').innerHTML = Portal.tools.map((t) => `<label class="pick"><input type="checkbox" value="${esc(t.slug)}" ${Portal.access.has(t.slug) ? 'checked' : ''}>
+      <span><b>${esc(t.name)}</b><span class="cat">${esc(t.category)}</span><p>${esc(t.description)}</p></span></label>`).join('');
+    $('#dlg-pick').showModal();
+  }
+  $('#btn-pick').addEventListener('click', openPicker);
+  $('#f-pick').addEventListener('submit', async (ev) => {
+    if (ev.submitter && ev.submitter.value === 'cancel') return;
+    ev.preventDefault();
+    const btn = $('#pick-save'); btn.disabled = true; $('#pick-err').textContent = '';
+    try {
+      const want = new Set($$('#pick-list input:checked').map((c) => c.value));
+      const add = [...want].filter((s) => !Portal.access.has(s)).map((s) => ({ user_id: Portal.user.id, tool_slug: s }));
+      const del = [...Portal.access].filter((s) => !want.has(s));
+      if (add.length) chk(await sb.from('tool_access').insert(add));
+      if (del.length) chk(await sb.from('tool_access').delete().eq('user_id', Portal.user.id).in('tool_slug', del));
+      Portal.access = want;
+      $('#dlg-pick').close();
+      if (location.hash.replace(/^#\/?/, '')) location.hash = '#/'; else route();
+      toast(want.size ? 'Listo. Tienes ' + want.size + ' herramienta(s) activas.' : 'No tienes herramientas activas por ahora.');
+    } catch (e) { $('#pick-err').textContent = 'No se pudo guardar: ' + enEspanol(e); }
+    finally { btn.disabled = false; }
+  });
 
   // ---------- herramienta abierta ----------
   const SNAPSHOT = { atr: { api: '__ATR', label: 'conciliación' } };
@@ -376,6 +431,16 @@
   // ---------- administración ----------
   let adm = { users: [], access: [] };
   async function loadAdmin() {
+    const isAdm = Portal.profile.role === 'admin';
+    $('#p-admin h2').textContent = isAdm ? 'Administración' : 'Mi equipo';
+    $('#p-admin .admin-head .muted').textContent = isAdm
+      ? 'Crea usuarios, nombra supervisores y activa o desactiva cada herramienta por persona. Los cambios se aplican al instante.'
+      : 'Crea a los analistas de tu equipo y activa las herramientas que cada uno necesita. Solo puedes repartir las herramientas que tú tienes.';
+    $('#admin-note').textContent = isAdm
+      ? 'El administrador tiene todas las herramientas. Un supervisor solo ve y maneja a los analistas de su equipo. Un usuario desactivado no puede entrar; su trabajo guardado se conserva.'
+      : 'Un analista desactivado no puede entrar al portal; su trabajo guardado se conserva. Para eliminar un usuario o cambiarlo de equipo, habla con el administrador.';
+    $('#signup-card').classList.toggle('hide', !isAdm);
+    if (isAdm) loadSignupCfg();
     const m = $('#matrix');
     m.innerHTML = '<tr><td class="muted">Cargando…</td></tr>';
     try {
@@ -383,23 +448,49 @@
         sb.from('profiles').select('*').order('role').order('full_name'),
         sb.from('tool_access').select('user_id,tool_slug')
       ]);
-      adm.users = chk(u); adm.access = chk(a);
+      const isSup = Portal.profile.role === 'supervisor';
+      adm.users = chk(u).filter((x) => !isSup || x.supervisor_id === Portal.user.id); adm.access = chk(a);
       renderMatrix();
     } catch (e) { m.innerHTML = '<tr><td class="form-err">No se pudo cargar: ' + esc(enEspanol(e)) + '</td></tr>'; }
   }
 
   function renderMatrix() {
+    const isAdm = Portal.profile.role === 'admin';
     const has = new Set(adm.access.map((x) => x.user_id + '|' + x.tool_slug));
-    const T = Portal.tools;
-    $('#matrix').innerHTML = `<thead><tr><th>Usuario</th>${T.map((t) => `<th>${esc(t.name)}</th>`).join('')}<th>Estado</th><th></th></tr></thead><tbody>${adm.users.map((u) => {
+    const T = isAdm ? Portal.tools : Portal.tools.filter((t) => Portal.access.has(t.slug));
+    const sups = adm.users.filter((u) => u.role === 'supervisor');
+    const supName = (id) => { const s = adm.users.find((x) => x.id === id); return s ? (s.full_name || s.username) : ''; };
+    const roleCell = (u) => u.role === 'admin' ? '<span class="pill adm">Administrador</span>'
+      : isAdm ? `<select class="sm" data-role="${u.id}" aria-label="Rol de ${esc(u.username)}"><option value="analista"${u.role === 'analista' ? ' selected' : ''}>Analista</option><option value="supervisor"${u.role === 'supervisor' ? ' selected' : ''}>Supervisor</option></select>`
+      : '<span class="muted">Analista</span>';
+    const teamCell = (u) => u.role !== 'analista' ? (u.role === 'supervisor' ? `<span class="pill sup">${adm.users.filter((x) => x.supervisor_id === u.id).length} en su equipo</span>` : '')
+      : `<select class="sm" data-sup="${u.id}" aria-label="Supervisor de ${esc(u.username)}"><option value="">Sin supervisor</option>${sups.map((s) => `<option value="${s.id}"${u.supervisor_id === s.id ? ' selected' : ''}>${esc(s.full_name || s.username)}</option>`).join('')}</select>`;
+    $('#matrix').innerHTML = `<thead><tr><th>Usuario</th>${isAdm ? '<th>Rol</th><th>Equipo</th>' : ''}${T.map((t) => `<th>${esc(t.name)}</th>`).join('')}<th>Estado</th><th></th></tr></thead><tbody>${adm.users.map((u) => {
       const isA = u.role === 'admin';
-      return `<tr class="${u.active ? '' : 'off'}"><td><div class="uname">${esc(u.full_name || u.username)}</div><div class="ulogin">${esc(u.username)}</div></td>
+      const dep = [u.departamento, u.origen === 'registro' ? 'se registró con código' : ''].filter(Boolean).join(' · ');
+      return `<tr class="${u.active ? '' : 'off'}"><td><div class="uname">${esc(u.full_name || u.username)}</div><div class="ulogin">${esc(u.username)}</div>${dep ? `<div class="udep">${esc(dep)}</div>` : ''}</td>
+      ${isAdm ? `<td>${roleCell(u)}</td><td>${teamCell(u)}</td>` : ''}
       ${T.map((t) => `<td><input type="checkbox" aria-label="${esc(t.name)} para ${esc(u.username)}" data-u="${u.id}" data-t="${esc(t.slug)}" ${isA || has.has(u.id + '|' + t.slug) ? 'checked' : ''} ${isA ? 'disabled' : ''}></td>`).join('')}
-      <td>${isA ? '<span class="pill adm">Administrador</span>' : u.active ? '<span class="pill on">Activo</span>' : '<span class="pill off">Desactivado</span>'}</td>
-      <td class="acts"><button class="btn sm ghost" data-pass="${u.id}">Clave</button>${isA ? '' : `<button class="btn sm ghost" data-act="${u.id}">${u.active ? 'Desactivar' : 'Activar'}</button><button class="btn sm ghost danger" data-delu="${u.id}">Eliminar</button>`}</td></tr>`;
+      <td>${isA ? '<span class="pill adm">Todas</span>' : u.active ? '<span class="pill on">Activo</span>' : '<span class="pill off">Desactivado</span>'}</td>
+      <td class="acts"><button class="btn sm ghost" data-pass="${u.id}">Clave</button>${isA ? '' : `<button class="btn sm ghost" data-act="${u.id}">${u.active ? 'Desactivar' : 'Activar'}</button>${isAdm ? `<button class="btn sm ghost danger" data-delu="${u.id}">Eliminar</button>` : ''}`}</td></tr>`;
     }).join('')}</tbody>`;
-    if (adm.users.length === 1) $('#matrix tbody').insertAdjacentHTML('beforeend', `<tr><td colspan="${T.length + 3}" class="muted" style="text-align:left">Aún no hay analistas. Usa «+ Nuevo analista» para crear el primero.</td></tr>`);
+    const cols = T.length + (isAdm ? 5 : 3);
+    if (isAdm && adm.users.length === 1) $('#matrix tbody').insertAdjacentHTML('beforeend', `<tr><td colspan="${cols}" class="muted" style="text-align:left">Aún no hay más usuarios. Usa «+ Nuevo analista» o comparte el código de registro.</td></tr>`);
+    if (!isAdm && !adm.users.length) $('#matrix tbody').insertAdjacentHTML('beforeend', `<tr><td colspan="${cols}" class="muted" style="text-align:left">Tu equipo está vacío. Usa «+ Nuevo analista» para crear el primero, o pide al administrador que te asigne a quienes ya se registraron.</td></tr>`);
 
+    $$('[data-role]').forEach((s) => s.onchange = async () => {
+      const u = adm.users.find((x) => x.id === s.dataset.role); const prev = u.role;
+      if (s.value === 'analista' && adm.users.some((x) => x.supervisor_id === u.id) && !confirm(`${u.full_name || u.username} deja de ser supervisor y su equipo queda sin supervisor. ¿Seguir?`)) { s.value = prev; return; }
+      s.disabled = true;
+      try { await adminFn({ action: 'update', user_id: u.id, role: s.value }); toast(s.value === 'supervisor' ? 'Ahora es supervisor' : 'Ahora es analista'); loadAdmin(); }
+      catch (e) { s.value = prev; s.disabled = false; toast(enEspanol(e)); }
+    });
+    $$('[data-sup]').forEach((s) => s.onchange = async () => {
+      const u = adm.users.find((x) => x.id === s.dataset.sup); const prev = u.supervisor_id || '';
+      s.disabled = true;
+      try { await adminFn({ action: 'update', user_id: u.id, supervisor_id: s.value || null }); u.supervisor_id = s.value || null; toast(s.value ? 'Asignado al equipo de ' + supName(s.value) : 'Quedó sin supervisor'); renderMatrix(); }
+      catch (e) { s.value = prev; s.disabled = false; toast(enEspanol(e)); }
+    });
     $$('#matrix input[type=checkbox]').forEach((c) => c.onchange = async () => {
       const row = { user_id: c.dataset.u, tool_slug: c.dataset.t };
       c.disabled = true;
@@ -433,7 +524,11 @@
 
   $('#btn-add-user').addEventListener('click', () => {
     const f = $('#f-user'); f.reset(); $('#user-err').textContent = '';
-    $('#user-tools').innerHTML = '<legend>Herramientas activas</legend>' + Portal.tools.map((t) => `<label><input type="checkbox" value="${esc(t.slug)}"> ${esc(t.name)}</label>`).join('');
+    const isAdm = Portal.profile.role === 'admin';
+    $$('#f-user .adm-only').forEach((x) => x.classList.toggle('hide', !isAdm));
+    $('#dlg-user h3').textContent = isAdm ? 'Nuevo usuario' : 'Nuevo analista de tu equipo';
+    $('#user-sup').innerHTML = '<option value="">Sin supervisor</option>' + adm.users.filter((u) => u.role === 'supervisor').map((u) => `<option value="${u.id}">${esc(u.full_name || u.username)}</option>`).join('');
+    $('#user-tools').innerHTML = '<legend>Herramientas activas</legend>' + Portal.tools.filter((t) => isAdm || Portal.access.has(t.slug)).map((t) => `<label><input type="checkbox" value="${esc(t.slug)}"> ${esc(t.name)}</label>`).join('');
     $('#dlg-user').showModal();
   });
 
@@ -443,9 +538,12 @@
     const f = ev.target, btn = $('#user-save');
     btn.disabled = true; $('#user-err').textContent = '';
     try {
-      await adminFn({ action: 'create', full_name: f.full_name.value, username: f.username.value, password: f.password.value, tools: $$('#user-tools input:checked').map((c) => c.value) });
+      const isAdm = Portal.profile.role === 'admin';
+      await adminFn({ action: 'create', full_name: f.full_name.value, username: f.username.value, password: f.password.value, departamento: f.departamento.value,
+        role: isAdm ? f.role.value : 'analista', supervisor_id: isAdm && f.role.value === 'analista' ? (f.supervisor_id.value || null) : null,
+        tools: $$('#user-tools input:checked').map((c) => c.value) });
       $('#dlg-user').close();
-      toast('Analista creado. Pásale su usuario y clave.');
+      toast((isAdm && f.role.value === 'supervisor' ? 'Supervisor' : 'Analista') + ' creado. Pásale su usuario y clave.');
       loadAdmin();
     } catch (e) { $('#user-err').textContent = enEspanol(e); }
     finally { btn.disabled = false; }
@@ -457,6 +555,24 @@
     const d = $('#dlg-pass');
     try { await adminFn({ action: 'set_password', user_id: d.dataset.u, password: ev.target.password.value }); d.close(); toast('Clave cambiada'); }
     catch (e) { $('#pass-err').textContent = enEspanol(e); }
+  });
+
+  // ---------- configuración del registro con código (solo administrador) ----------
+  async function loadSignupCfg() {
+    const f = $('#f-signupcfg');
+    try { const c = await adminFn({ action: 'get_signup' }); f.enabled.checked = !!c.enabled; f.code.value = c.code || ''; $('#signupcfg-st').textContent = ''; }
+    catch (e) { $('#signupcfg-st').textContent = 'No se pudo leer: ' + enEspanol(e); }
+  }
+  $('#f-signupcfg').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const f = ev.target, st = $('#signupcfg-st'), btn = $('button', f);
+    btn.disabled = true; st.textContent = 'Guardando…';
+    try {
+      await adminFn({ action: 'set_signup', code: f.code.value.trim().toUpperCase(), enabled: f.enabled.checked });
+      f.code.value = f.code.value.trim().toUpperCase();
+      st.textContent = f.enabled.checked ? 'Guardado. El registro está abierto.' : 'Guardado. El registro está cerrado.';
+    } catch (e) { st.textContent = enEspanol(e); }
+    finally { btn.disabled = false; }
   });
 
   // ---------- arranque ----------
