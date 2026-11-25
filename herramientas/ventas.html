@@ -335,8 +335,17 @@ const VLV = (function () {
     if (!one) return null;
     return { from: one.n, to: one.n, w: one.w, prefix: one.prefix };
   }
+  // "00000364-00000365-00000366": lista de números en una sola línea (3 o más) -> [{from,to,w,prefix}...]
+  function parseNums(t) {
+    const v = s(t); const parts = v.split(/\s*[-–,;\/]\s*/).filter(Boolean);
+    if (parts.length >= 3 && parts.every(x => /^\d+$/.test(x))) return parts.map(x => ({ from: +x, to: +x, w: x.length, prefix: '' }));
+    const rg = parseRange(v); return rg ? [rg] : null;
+  }
   const normKey = t => { const p = splitNum(t); return p ? p.prefix + '#' + p.n : s(t).toUpperCase(); };
-  const isSerial = t => /^[A-Z]{2,4}\d{6,9}$/.test(s(t).toUpperCase());
+  // serial de máquina fiscal: letras y dígitos, termina en 6 a 9 dígitos (ej. ZPA1234567, Z1F0004034, EOD0001234)
+  const isSerial = t => { const v = s(t).toUpperCase().replace(/[\s-]/g, ''); return /^[A-Z][A-Z0-9]{1,5}\d{6,9}$/.test(v) && /\d{6,}$/.test(v); };
+  // "00008536- 00008541": varias facturas unidas en una línea (ventas a personas naturales por máquina fiscal)
+  const isRange = t => { const rg = parseRange(t); return !!(rg && rg.to > rg.from && /[-–]/.test(s(t))); };
 
   // RIF venezolano
   const LETRA = { V: 1, E: 2, J: 3, P: 4, G: 5, C: 3 };
@@ -522,7 +531,7 @@ const VLV = (function () {
     rows.forEach(r => {
       r.tipoDoc = r.factura ? 'FAC' : r.nd ? 'ND' : r.nc ? 'NC' : (r.afectada && (r.comprobante || r.retenido)) ? 'RET' : 'NADA';
       r.num = r.factura || r.nd || r.nc || '';
-      r.maquina = isSerial(r.serie);
+      r.maquina = isSerial(r.serie) || (s(r.serie).length >= 6 && /\d{4,}/.test(s(r.serie)) && /resumen/i.test(r.nombre));
       r.anulada = /anulad/i.test(r.nombre);
       r.resumen = /resumen/i.test(r.nombre);
       r.cAny = [r.c_total, r.c_exento, r.c_base, r.c_iva, r.c_base2, r.c_iva2].some(v => Math.abs(v) > 0.000001);
@@ -738,12 +747,16 @@ const VLV = (function () {
     const flGroups = {};
     rows.forEach(r => {
       if (r.maquina || r.tipoDoc === 'RET' || r.tipoDoc === 'NADA') return;
-      const p = splitNum(r.num);
+      // una línea puede traer un rango (desde-hasta) de documentos unidos: se cuentan todos los números que cubre
+      const rg = isRange(r.num) ? parseRange(r.num) : null;
+      const p = rg ? { n: rg.from, w: rg.w, prefix: (rg.prefix || '').replace(/\s/g, '') } : splitNum(r.num);
       if (!p) { add('error', 'Identificación', 'Número de documento "' + r.num + '" sin parte numérica.', r); return; }
       const k = r.tipoDoc + '|' + (r.serie || 'Única') + '|' + p.prefix;
-      (flGroups[k] = flGroups[k] || []).push({ n: p.n, w: p.w, prefix: p.prefix, r });
-      const c = splitNum(r.control);
-      if (c) { const kc = 'CTRL|*|' + c.prefix; (flGroups[kc] = flGroups[kc] || []).push({ n: c.n, w: c.w, prefix: c.prefix, r, ctrl: true }); }
+      const g = (flGroups[k] = flGroups[k] || []);
+      for (let n = p.n; n <= (rg ? rg.to : p.n); n++) g.push({ n, w: p.w, prefix: p.prefix, r });
+      const crg = isRange(r.control) ? parseRange(r.control) : null;
+      const c = crg ? { n: crg.from, w: crg.w, prefix: (crg.prefix || '').replace(/\s/g, '') } : splitNum(r.control);
+      if (c) { const kc = 'CTRL|*|' + c.prefix; const gc = (flGroups[kc] = flGroups[kc] || []); for (let n = c.n; n <= (crg ? crg.to : c.n); n++) gc.push({ n, w: c.w, prefix: c.prefix, r, ctrl: true }); }
     });
     Object.keys(flGroups).sort().forEach(k => {
       const [t, serie] = k.split('|');
@@ -754,7 +767,7 @@ const VLV = (function () {
     {
       const g = {};
       rows.filter(r => !r.maquina && ['FAC', 'ND', 'NC'].includes(r.tipoDoc)).forEach(r => {
-        const a = splitNum(r.num), c = splitNum(r.control); if (!a || !c) return;
+        const a = splitNum(r.num), c = splitNum(r.control); if (!a || !c || isRange(r.num)) return;
         const k = r.tipoDoc + '|' + r.serie + '|' + a.prefix + '|' + c.prefix;
         (g[k] = g[k] || []).push({ r, d: c.n - a.n, n: a.n });
       });
@@ -778,9 +791,9 @@ const VLV = (function () {
       ['FAC', 'NC', 'ND'].forEach(t => {
         const ranges = [];
         list.filter(r => r.tipoDoc === t).forEach(r => {
-          const rg = parseRange(r.num);
-          if (!rg) { add('error', 'Máquina fiscal', 'Número "' + r.num + '" no es un número ni un rango válido.', r); return; }
-          ranges.push({ ...rg, r });
+          const rgs = parseNums(r.num);
+          if (!rgs) { add('error', 'Máquina fiscal', 'Número "' + r.num + '" no es un número ni un rango válido.', r); return; }
+          rgs.forEach(rg => ranges.push({ ...rg, r }));
         });
         if (!ranges.length) return;
         ranges.sort((a, b) => a.from - b.from);
