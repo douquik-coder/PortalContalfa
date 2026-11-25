@@ -37,6 +37,54 @@
     return Promise.resolve(null);
   };
 
+  // Asistente de carga: antes de que la herramienta lea un archivo, el portal lo revisa y, si hace falta, lo ordena.
+  // La herramienta recibe el archivo como si el analista lo hubiera elegido directamente.
+  if (P.assist && P.assistSlots) {
+    var slots = P.assistSlots(slug);
+    var findSlot = function (el, kind) {
+      for (var i = 0; i < slots.length; i++) {
+        var s = slots[i];
+        if (kind === 'change' && el.matches && el.matches(s.selector)) return s;
+        if (kind === 'drop' && s.drop && el.closest && el.closest(s.drop)) return s;
+      }
+      return null;
+    };
+    var rebuild = function (files) {
+      var dt = new DataTransfer();
+      files.forEach(function (f) { dt.items.add(new File([f], f.name, { type: f.type, lastModified: f.lastModified || Date.now() })); });
+      return dt;
+    };
+    var run = function (slot, files, deliver) {
+      var list = Array.prototype.slice.call(files || []);
+      if (!list.length) return;
+      Promise.resolve(P.assist(slug, slot.id, list)).then(function (out) {
+        if (out && out.length) deliver(rebuild(out));
+      }, function (err) { console.error('Asistente de carga:', err); deliver(rebuild(list)); });
+    };
+    window.addEventListener('change', function (e) {
+      var el = e.target;
+      if (e.__pcPass || !el || el.type !== 'file') return;
+      var slot = findSlot(el, 'change'); if (!slot || !el.files || !el.files.length) return;
+      e.stopImmediatePropagation();
+      var files = el.files;
+      run(slot, files, function (dt) {
+        try { el.files = dt.files; } catch (x) {}
+        var ev = new Event('change', { bubbles: true }); ev.__pcPass = true; el.dispatchEvent(ev);
+      });
+      try { el.value = ''; } catch (x) {}
+    }, true);
+    window.addEventListener('drop', function (e) {
+      if (e.__pcPass) return;
+      var slot = findSlot(e.target, 'drop'); if (!slot || !e.dataTransfer || !e.dataTransfer.files.length) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      var target = e.target;
+      try { var z = target.closest(slot.drop); z.classList.remove('over', 'drag', 'hover', 'dragover', 'is-over', 'active'); } catch (x) {}
+      run(slot, e.dataTransfer.files, function (dt) {
+        var ev = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }); ev.__pcPass = true; target.dispatchEvent(ev);
+      });
+    }, true);
+  }
+
   // Aviso al portal cuando cambia el trabajo (lo usan las herramientas con guardado automático)
   window.addEventListener('portal:change', function () { try { P.onToolChange(slug); } catch (e) {} });
 })();

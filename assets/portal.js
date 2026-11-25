@@ -50,7 +50,8 @@
     canUse(slug) { return this.access.has(slug); },
     toolHasCloudDb(slug) { return slug === 'ventas' && this.canUse(slug); },
     makeDb(slug) { return makeDb(slug); },
-    onToolChange(slug) { if (cur.slug === slug && cur.snapshot) markDirty(); }
+    onToolChange(slug) { if (cur.slug === slug && cur.snapshot) markDirty(); },
+    toast(t) { toast(t); }
   };
 
   // Base de datos tipo "colecciones y documentos" que usa el Validador de libro de ventas, guardada por usuario.
