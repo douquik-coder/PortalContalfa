@@ -768,7 +768,7 @@
       const render = () => {
         const o = ana.opt; const rows = ana.sheet.rows;
         const hdr = o.hdrRow >= 0 ? rows[o.hdrRow] || [] : [];
-        const sample = (j) => { const v = rows.slice(o.hdrRow + 1, o.hdrRow + 40).map((r) => r && r[j]).find((x) => !blank(x)); return v === undefined ? '' : txt(typeof v === 'number' && v > 20000 && v < 80000 && Number.isInteger(v) ? fmtDate(toDate(v)) : v).slice(0, 24); };
+        const sample = (j) => { const v = rows.slice(o.hdrRow + 1, o.hdrRow + 40).filter((r) => r && r.filter((c) => !blank(c)).length > 1).map((r) => r[j]).find((x) => !blank(x)); return v === undefined ? '' : txt(typeof v === 'number' && v > 20000 && v < 80000 && Number.isInteger(v) ? fmtDate(toDate(v)) : v).slice(0, 24); };
         const colOpts = (sel) => `<option value="-1">— No está en el archivo —</option>` + Array.from({ length: ana.width }, (_, j) => `<option value="${j}" ${sel === j ? 'selected' : ''}>${colL(j)} · ${esc(txt(hdr[j]) || 'sin título')}${sample(j) ? ' — ej: ' + esc(sample(j)) : ''}</option>`).join('');
         const fields = doc().fields.filter((f) => !(ana.docType === 'mayor' && ((o.amountMode === 'signed' && (f.k === 'debe' || f.k === 'haber')) || (o.amountMode === 'dh' && f.k === 'monto') || (o.grouped && (f.k === 'cuenta' || f.k === 'cuentaNombre')))));
         const prev = buildAoA(ana, ana.ex).slice(0, 9);
@@ -779,7 +779,7 @@
           <div class="as-head"><div><div class="as-kicker">Asistente de carga · ${esc(TOOL_NAME[ana.slug])}</div><h3>${esc(ana.file.name)}</h3></div>
             <span class="badge">${esc(doc().name)}</span></div>
           <p class="as-status">${status}</p>
-          <div class="as-ai ${ai || aiBusy || aiErr ? '' : 'hide'}">${aiBusy ? '<span class="as-spin"></span> La IA está revisando el archivo…' : aiErr ? '✨ ' + esc(aiErr) : ai ? '✨ <b>IA:</b> ' + esc(ai.explicacion || '') + (ai.es_otro_documento ? ' <b>Parece: ' + esc(ai.es_otro_documento) + '.</b>' : '') + (ai._diff ? ` <button type="button" class="btn sm" id="as-apply-ai">Usar columnas sugeridas por la IA</button>` : '') : ''}</div>
+          <div class="as-ai">${aiBusy ? '<span class="as-spin"></span> La IA está revisando el archivo…' : aiErr ? '✨ ' + esc(aiErr) + ' <button type="button" class="btn sm" id="as-ask">Reintentar</button>' : !ai ? '✨ ¿Dudas con este archivo? <button type="button" class="btn sm" id="as-ask">Pedir revisión a la IA</button>' : ai ? '✨ <b>IA:</b> ' + esc(ai.explicacion || '') + (ai.es_otro_documento ? ' <b>Parece: ' + esc(ai.es_otro_documento) + '.</b>' : '') + (ai._diff ? ` <button type="button" class="btn sm" id="as-apply-ai">Usar columnas sugeridas por la IA</button>` : '') : ''}</div>
           <ul class="as-checks">${ana.checks.map((c) => `<li class="${c.sev}"><span>${SEV[c.sev]}</span><div>${c.msg}${c.periodPick ? `<div class="as-inline">Usar: <select id="as-month"><option value="">todos los meses</option>${ana.months.map((m) => `<option value="${m.k}" ${o.onlyMonth === m.k ? 'selected' : ''}>solo ${esc(m.label)} (${m.n})</option>`).join('')}</select></div>` : ''}${c.dups ? `<label class="as-inline"><input type="checkbox" id="as-dups" ${o.dropDups ? 'checked' : ''}> Quitar las filas repetidas</label>` : ''}</div></li>`).join('') || '<li class="ok"><span>✅</span><div>Todo en orden.</div></li>'}</ul>
           ${ana.status === 'review' && !showCols ? `<p><button type="button" class="btn sm ghost" id="as-showcols">Ver o ajustar columnas</button></p>` : ''}
           <div class="as-cols ${showCols ? '' : 'hide'}">
@@ -825,6 +825,7 @@
         if ($('#as-month')) $('#as-month').onchange = re((e) => { ana.opt.onlyMonth = e.target.value; });
         if ($('#as-dups')) $('#as-dups').onchange = re((e) => { ana.opt.dropDups = e.target.checked; });
         if ($('#as-showcols')) $('#as-showcols').onclick = () => { showCols = true; render(); };
+        if ($('#as-ask')) $('#as-ask').onclick = () => runAI();
         if ($('#as-apply-ai')) $('#as-apply-ai').onclick = re(() => applyAI(true));
         $('#as-skip').onclick = () => done(null);
         if ($('#as-orig')) $('#as-orig').onclick = () => done(ana.file);
@@ -865,11 +866,13 @@
       d.showModal();
       d.scrollTop = 0;
       // Pedir a la IA su lectura del archivo (solo si hay algo que revisar)
-      if (ana.status === 'fix' || ana.other || ana.wrongDoc) {
-        aiBusy = true; render();
+      // La IA se consulta sola solo cuando hace falta (columnas sin identificar o documento dudoso), para cuidar el límite gratuito
+      function runAI() {
+        aiBusy = true; aiErr = ''; render();
         askAI(ana, ana.sheets).then((res) => { ai = res; aiBusy = false; const before = ana.complete; applyAI(false); recompute(ana); if (!before && ana.complete) ai.explicacion = (ai.explicacion || '') + ' Ya completé las columnas con su sugerencia; revísalas.'; render(); })
           .catch((e) => { aiBusy = false; aiErr = e.message; render(); });
       }
+      if ((ana.status === 'fix' && !ana.complete) || ana.other || ana.wrongDoc) runAI();
     });
   }
 

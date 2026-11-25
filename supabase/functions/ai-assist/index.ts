@@ -46,7 +46,9 @@ async function listModels(): Promise<string[]> {
 async function gemini(prompt: string) {
   const errs: string[] = [];
   const order = [...new Set([...MODELS, ...(await listModels())])];
-  for (const model of order) {
+  let waited = 0;
+  for (let i = 0; i < order.length; i++) {
+    const model = order[i];
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": KEY },
@@ -64,8 +66,14 @@ async function gemini(prompt: string) {
       catch { errs.push(model + ": respuesta no legible"); continue; }
     }
     errs.push(`${model}: ${r.status}`);
+    // Límite por minuto del plan gratuito: se espera un momento y se reintenta el mismo modelo (máximo ~12 s en total)
+    if (r.status === 429 && waited < 12000) {
+      const m = t.match(/"retryDelay":\s*"(\d+(?:\.\d+)?)s"/);
+      const ms = Math.min(8000, Math.max(1500, m ? parseFloat(m[1]) * 1000 : 4000), 12000 - waited);
+      await new Promise((res) => setTimeout(res, ms)); waited += ms; i--; continue;
+    }
     if (r.status === 401 || r.status === 403) throw new Error("La clave de Gemini no es válida o no tiene permiso. Revisa GEMINI_API_KEY en Supabase.");
-    if (r.status === 429 && errs.length >= 3) throw new Error("La IA alcanzó el límite gratuito por ahora. Intenta en un minuto o ajusta las columnas a mano.");
+    if (r.status === 429 && errs.length >= 5) throw new Error("La IA alcanzó el límite gratuito por ahora. Intenta en un minuto o ajusta las columnas a mano.");
     // 404 (modelo retirado), 400, 429 o 5xx (saturado): se prueba el siguiente modelo
   }
   throw new Error("La IA no está disponible en este momento (" + errs.join(", ") + "). Puedes ajustar las columnas a mano.");
