@@ -95,6 +95,7 @@ Deno.serve(async (req) => {
       if (!tgt) return fail("Usuario no encontrado.", 404);
       if (!isAdmin && tgt.supervisor_id !== me!.id) return fail("Ese usuario no es de tu equipo.", 403);
     }
+    if (["set_password", "set_active", "update", "delete"].includes(action) && !tgt) return fail("Falta indicar el usuario.");
     // herramientas que un supervisor puede repartir: las suyas
     const myTools = async () => isAdmin ? null : new Set(((await admin.from("tool_access").select("tool_slug").eq("user_id", me!.id)).data || []).map((x) => x.tool_slug));
 
@@ -113,7 +114,6 @@ Deno.serve(async (req) => {
     if (action === "set_password") {
       const p = String(body.password || "");
       if (!okPass(p)) return fail("La clave debe tener al menos 8 caracteres.");
-      if (!isAdmin && !tgt) return fail("Falta el usuario.");
       const { error } = await admin.auth.admin.updateUserById(target, { password: p });
       if (error) return fail(error.message);
       return json({ ok: true });
