@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Portal Contalfa</title>
+<meta name="description" content="Herramientas de trabajo de Contalfa">
+<meta name="theme-color" content="#1d6c84">
+<link rel="icon" type="image/png" href="/assets/icono.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/portal.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+
+<!-- Cargando -->
+<div id="v-loading" class="center-screen"><div class="spinner" aria-label="Cargando"></div></div>
+
+<!-- Inicio de sesión -->
+<div id="v-login" class="auth hide">
+  <form class="auth-card" id="f-login" autocomplete="on">
+    <img src="/assets/logo.png" alt="Contalfa" class="auth-logo">
+    <h1>Portal de herramientas</h1>
+    <p class="muted">Entra con tu usuario y clave.</p>
+    <label>Usuario<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+    <label>Clave<input name="password" type="password" autocomplete="current-password" required></label>
+    <div class="form-err" id="login-err" role="alert"></div>
+    <button class="btn primary block" type="submit">Entrar</button>
+    <p class="auth-foot hide" id="setup-link">¿Primera vez? <a href="#" id="go-setup">Activar la cuenta de administrador</a></p>
+  </form>
+</div>
+
+<!-- Activación del administrador (solo la primera vez) -->
+<div id="v-setup" class="auth hide">
+  <form class="auth-card" id="f-setup" autocomplete="off">
+    <img src="/assets/logo.png" alt="Contalfa" class="auth-logo">
+    <h1>Activar administrador</h1>
+    <p class="muted">Esto se hace una sola vez. Usa el código de activación que te dio Claude.</p>
+    <label>Código de activación<input name="code" required autocapitalize="characters" spellcheck="false"></label>
+    <label>Tu nombre<input name="full_name" required placeholder="Douglas Leal"></label>
+    <label>Usuario<input name="username" required autocapitalize="none" spellcheck="false" placeholder="douglas"></label>
+    <label>Clave (mínimo 8 caracteres)<input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+    <label>Repite la clave<input name="password2" type="password" minlength="8" autocomplete="new-password" required></label>
+    <div class="form-err" id="setup-err" role="alert"></div>
+    <button class="btn primary block" type="submit">Crear administrador</button>
+    <p class="auth-foot"><a href="#" id="back-login">Volver a iniciar sesión</a></p>
+  </form>
+</div>
+
+<!-- Sin acceso -->
+<div id="v-denied" class="auth hide">
+  <div class="auth-card">
+    <img src="/assets/logo.png" alt="Contalfa" class="auth-logo">
+    <h1>Sin acceso</h1>
+    <p class="muted" id="denied-msg">Tu usuario no está activo. Habla con el administrador.</p>
+    <button class="btn block" data-logout>Cerrar sesión</button>
+  </div>
+</div>
+
+<!-- Aplicación -->
+<div id="v-app" class="hide">
+  <header class="top">
+    <a href="#/" class="brand" aria-label="Inicio"><img src="/assets/logo.png" alt="Contalfa"></a>
+    <nav class="nav">
+      <a href="#/" data-nav="home">Herramientas</a>
+      <a href="#/admin" data-nav="admin" class="hide" id="nav-admin">Administración</a>
+    </nav>
+    <div class="who">
+      <span class="who-name" id="who-name"></span>
+      <button class="btn ghost sm" data-logout>Salir</button>
+    </div>
+  </header>
+
+  <!-- Menú de herramientas -->
+  <main id="p-home" class="page">
+    <div class="wrap">
+      <h2 class="hello" id="hello"></h2>
+      <p class="muted">Estas son las herramientas que tienes activas. Siempre abres la última versión.</p>
+      <div class="grid" id="tool-grid"></div>
+      <div class="empty hide" id="no-tools">Todavía no tienes herramientas activas. Pídele al administrador que te las active.</div>
+    </div>
+  </main>
+
+  <!-- Herramienta abierta -->
+  <section id="p-tool" class="page tool-page hide">
+    <div class="toolbar">
+      <a href="#/" class="btn ghost sm back" aria-label="Volver al menú">‹ Menú</a>
+      <div class="tb-title"><b id="tool-name"></b><span class="badge" id="tool-badge"></span></div>
+      <div class="tb-actions" id="tool-actions">
+        <span class="save-st" id="save-st"></span>
+        <button class="btn sm" id="btn-new">Nuevo</button>
+        <button class="btn sm" id="btn-rename">Nombre</button>
+        <button class="btn sm primary" id="btn-list">Mis trabajos</button>
+      </div>
+    </div>
+    <iframe id="tool-frame" title="Herramienta"></iframe>
+  </section>
+
+  <!-- Administración -->
+  <main id="p-admin" class="page hide">
+    <div class="wrap">
+      <div class="admin-head">
+        <div>
+          <h2>Administración</h2>
+          <p class="muted">Crea usuarios y activa o desactiva cada herramienta por analista. Los cambios se aplican al instante.</p>
+        </div>
+        <button class="btn primary" id="btn-add-user">+ Nuevo analista</button>
+      </div>
+      <div class="card">
+        <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+      </div>
+      <p class="note">El administrador tiene todas las herramientas. Un analista desactivado no puede entrar al portal; su trabajo guardado se conserva.</p>
+    </div>
+  </main>
+</div>
+
+<!-- Diálogos -->
+<dialog id="dlg-user" class="dlg">
+  <form method="dialog" id="f-user">
+    <h3>Nuevo analista</h3>
+    <label>Nombre<input name="full_name" required></label>
+    <label>Usuario<input name="username" required autocapitalize="none" spellcheck="false" placeholder="maria"></label>
+    <label>Clave inicial (mínimo 8 caracteres)<input name="password" minlength="8" required autocomplete="new-password"></label>
+    <fieldset class="checks" id="user-tools"><legend>Herramientas activas</legend></fieldset>
+    <div class="form-err" id="user-err"></div>
+    <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" id="user-save" value="ok">Crear</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-pass" class="dlg">
+  <form method="dialog" id="f-pass">
+    <h3>Cambiar clave</h3>
+    <p class="muted" id="pass-who"></p>
+    <label>Nueva clave (mínimo 8 caracteres)<input name="password" minlength="8" required autocomplete="new-password"></label>
+    <div class="form-err" id="pass-err"></div>
+    <div class="dlg-actions"><button class="btn" value="cancel" formnovalidate>Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-list" class="dlg wide">
+  <div>
+    <div class="dlg-top"><h3>Mis trabajos guardados</h3><button class="btn ghost sm" data-close>Cerrar</button></div>
+    <p class="muted">Se guardan solos mientras trabajas. Ábrelos desde cualquier equipo con tu usuario.</p>
+    <div id="work-list" class="work-list"></div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script src="/assets/config.js"></script>
+<script src="/assets/portal.js"></script>
+</body>
+</html>

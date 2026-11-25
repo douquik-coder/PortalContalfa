@@ -1,0 +1,1354 @@
+<!doctype html><html><head>
+<script src="/assets/bridge.js"></script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Validador de Libros de Ventas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: barra de período arriba, panel de carga a la izquierda y resultados a la derecha; en teléfono, una sola columna. */
+:root{
+  --bg:#EEF2F5; --surface:#FFFFFF; --sunk:#F6F8FA; --ink:#14202B; --muted:#5A6876; --line:#D8DFE6;
+  --accent:#0E5A70; --accent-ink:#FFFFFF; --accent-soft:#E1EEF2;
+  --err:#B42318; --err-soft:#FDECEA; --warn:#A15C07; --warn-soft:#FDF3E1; --info:#2B66A6; --info-soft:#E7F0FA; --ok:#15724A; --ok-soft:#E3F4EA;
+  --f-body:"Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E141A; --surface:#161F27; --sunk:#111920; --ink:#E4EAF0; --muted:#94A3B1; --line:#283541;
+  --accent:#5DB4CC; --accent-ink:#06222B; --accent-soft:#16323C;
+  --err:#F5867C; --err-soft:#3A1A18; --warn:#F2B455; --warn-soft:#382A12; --info:#82B6EC; --info-soft:#162A40; --ok:#5ACB91; --ok-soft:#123224; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E141A; --surface:#161F27; --sunk:#111920; --ink:#E4EAF0; --muted:#94A3B1; --line:#283541;
+  --accent:#5DB4CC; --accent-ink:#06222B; --accent-soft:#16323C;
+  --err:#F5867C; --err-soft:#3A1A18; --warn:#F2B455; --warn-soft:#382A12; --info:#82B6EC; --info-soft:#162A40; --ok:#5ACB91; --ok-soft:#123224; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{margin:0;text-wrap:balance}
+h1{font-size:1.45rem;font-weight:800;letter-spacing:-.01em}
+h2{font-size:1rem;font-weight:700}
+h3{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.num{text-align:right;white-space:nowrap}
+.muted{color:var(--muted)}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.brand{display:flex;flex-direction:column;gap:4px}
+.brand p{margin:0;color:var(--muted);max-width:70ch}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px}
+.tabs button{border:0;background:transparent;color:var(--muted);font:600 13px var(--f-body);padding:7px 16px;border-radius:999px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--sunk);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.pill.ok .dot{background:var(--ok)} .pill.warn .dot{background:var(--warn)}
+.grid{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.side{position:sticky;top:max(12px, env(safe-area-inset-top, 0px))}
+@media (max-width:900px){.side{position:static}}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label,.lbl{font-size:12px;font-weight:600;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row > *{min-width:0}
+select,input[type=text],input[type=number],input[type=search]{font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0;width:100%}
+select:focus-visible,input:focus-visible,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{font:600 13px var(--f-body);border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--err)}
+.btn.small{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.linkbtn{border:0;background:none;color:var(--accent);font:600 13px var(--f-body);cursor:pointer;padding:0}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);background:var(--sunk);padding:18px 14px;text-align:center;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop strong{font-size:14px}
+.drop .muted{font-size:12px}
+.split2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.split3{display:grid;grid-template-columns:1.25fr .85fr 1.25fr;gap:8px}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-weight:600;font-size:13px}
+details[open] summary{margin-bottom:10px}
+.mapgrid{display:grid;grid-template-columns:minmax(0,1fr) 78px;gap:6px 8px;align-items:center;font-size:12px;max-height:340px;overflow:auto;padding-right:4px}
+.mapgrid select{padding:4px 6px}
+.note{font-size:12px;color:var(--muted);margin:0}
+.banner{border-radius:var(--r);padding:10px 14px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.banner.example{background:var(--info-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--info) 35%,transparent)}
+.verdict{display:flex;flex-direction:row;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;border-left:5px solid var(--ok);}
+.verdict.has-err{border-left-color:var(--err)} .verdict.has-warn{border-left-color:var(--warn)}
+.verdict .big{font-size:1.25rem;font-weight:800}
+.verdict .meta{display:flex;flex-wrap:wrap;gap:6px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .v{font-family:var(--f-mono);font-size:1.12rem;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .s{font-size:12px;color:var(--muted)}
+.chk{font-size:12px;font-weight:600}
+.chk.ok{color:var(--ok)} .chk.bad{color:var(--err)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{position:sticky;top:0;background:var(--sunk);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.sev{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.sev.error{background:var(--err-soft);color:var(--err)} .sev.warn{background:var(--warn-soft);color:var(--warn)} .sev.info{background:var(--info-soft);color:var(--info)} .sev.ok{background:var(--ok-soft);color:var(--ok)} .sev.none{background:var(--sunk);color:var(--muted)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:999px;padding:5px 12px;font:600 12px var(--f-body);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.chip[aria-pressed="true"].error{background:var(--err-soft);color:var(--err);border-color:var(--err)}
+.chip[aria-pressed="true"].warn{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.chip[aria-pressed="true"].info{background:var(--info-soft);color:var(--info);border-color:var(--info)}
+.filters select,.filters input{width:auto;flex:1 1 160px}
+.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.confirm{border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-size:13px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom, 0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:600;font-size:13px;z-index:20;max-width:calc(100% - 32px)}
+.checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.checks li{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px}
+.checks b{display:block;margin-bottom:2px}
+.cont{font-size:12px;font-weight:600;white-space:nowrap}
+.cont.ok{color:var(--ok)} .cont.bad{color:var(--err)} .cont.none{color:var(--muted)}
+.hist-emp{display:flex;flex-direction:column;gap:10px}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 0.8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spin{animation:none}}
+.newemp{display:flex;flex-direction:column;gap:8px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Validador de Libros de Ventas</h1>
+      <p>Revisa el libro de ventas en Excel contra las reglas del IVA: correlativos, números de control, reportes Z, cálculos, RIF y retenciones. Guarda cada período para continuar el correlativo en el siguiente.</p>
+    </div>
+    <div class="row">
+      <span class="pill" id="storePill"><span class="dot"></span><span id="storeTxt">Conectando histórico…</span></span>
+      <nav class="tabs" role="tablist">
+        <button role="tab" id="tabVal" aria-selected="true">Validar</button>
+        <button role="tab" id="tabHist" aria-selected="false">Histórico</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ======== VALIDAR ======== -->
+  <section id="viewVal" class="grid">
+    <aside class="panel side">
+      <div class="field">
+        <label for="empSel">Empresa</label>
+        <div class="row" style="flex-wrap:nowrap">
+          <select id="empSel"></select>
+          <button class="btn small" id="btnNewEmp" type="button">Nueva</button>
+        </div>
+      </div>
+      <form id="newEmp" class="newemp" hidden>
+        <div class="field"><label for="neNombre">Razón social</label><input type="text" id="neNombre" required placeholder="Ej.: Comercializadora Ávila, C.A."></div>
+        <div class="split2">
+          <div class="field"><label for="neRif">RIF</label><input type="text" id="neRif" placeholder="J123456789"></div>
+          <div class="field"><label for="neTipo">Facturación</label><select id="neTipo"></select></div>
+        </div>
+        <div class="row"><button class="btn primary small" type="submit">Crear empresa</button><button class="btn small" type="button" id="neCancel">Cancelar</button></div>
+        <p class="note" id="neMsg"></p>
+      </form>
+      <div class="field">
+        <label for="tipoSel">Tipo de facturación</label>
+        <select id="tipoSel"></select>
+        <p class="note" id="tipoNote"></p>
+      </div>
+      <div class="field">
+        <span class="lbl">Período del libro</span>
+        <div class="split3">
+          <select id="perMes" aria-label="Mes"></select>
+          <input type="number" id="perAnio" aria-label="Año" min="2000" max="2100">
+          <select id="perTipo" aria-label="Tipo de período"><option value="M">Mensual</option><option value="Q1">1ª quinc.</option><option value="Q2">2ª quinc.</option></select>
+        </div>
+        <p class="note" id="perNote">Se detecta con las fechas del libro; puede cambiarlo.</p>
+      </div>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Cargar libro de ventas">
+        <strong>Suelte aquí el libro de ventas</strong>
+        <span class="muted">o haga clic para elegir el archivo · .xls, .xlsx o .csv</span>
+        <span class="mono muted" id="fileName"></span>
+      </div>
+      <input type="file" id="fileIn" accept=".xls,.xlsx,.xlsm,.csv" hidden>
+      <details id="advDet">
+        <summary>Parámetros y columnas</summary>
+        <div class="field" style="gap:10px">
+          <div class="split2">
+            <div class="field"><label for="cfgTol">Tolerancia (Bs.)</label><input type="number" id="cfgTol" step="0.01" min="0"></div>
+            <div class="field"><label for="cfgGap">Salto que separa rangos</label><input type="number" id="cfgGap" step="1" min="1"></div>
+          </div>
+          <div class="split2">
+            <div class="field"><label for="cfgAlic">Alícuotas válidas %</label><input type="text" id="cfgAlic"></div>
+            <div class="field"><label for="cfgRet">% de retención</label><input type="text" id="cfgRet"></div>
+          </div>
+          <div class="sectionhead"><span class="lbl">Columna del Excel para cada dato</span><button class="linkbtn" type="button" id="mapReset">Formato estándar</button></div>
+          <div class="mapgrid" id="mapGrid"></div>
+          <p class="note" id="mapNote"></p>
+          <div class="row"><button class="btn small" type="button" id="mapApply">Aplicar y validar</button><button class="btn small" type="button" id="mapSave">Guardar para la empresa</button></div>
+        </div>
+      </details>
+    </aside>
+
+    <main style="display:flex;flex-direction:column;gap:16px;min-width:0" id="results">
+      <div class="banner example" id="exBanner" hidden>
+        <span><b>Libro de ejemplo con datos ficticios.</b> Cargue su archivo a la izquierda para validarlo.</span>
+      </div>
+      <div class="panel verdict" id="verdict"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="panel">
+        <div class="sectionhead">
+          <h2>Correlativos</h2>
+          <span class="note" id="contNote"></span>
+        </div>
+        <div class="tablewrap"><table id="seriesTbl"></table></div>
+      </div>
+      <div class="panel">
+        <div class="sectionhead">
+          <h2>Hallazgos</h2>
+          <div class="row">
+            <button class="btn small" type="button" id="btnCopy">Copiar</button>
+            <button class="btn small" type="button" id="btnExport" hidden>Exportar a Excel</button>
+            <button class="btn primary small" type="button" id="btnSave">Guardar período en histórico</button>
+          </div>
+        </div>
+        <div id="saveBox"></div>
+        <div class="filters">
+          <button class="chip error" aria-pressed="true" data-sev="error" type="button">Errores <span class="mono" id="cErr">0</span></button>
+          <button class="chip warn" aria-pressed="true" data-sev="warn" type="button">Advertencias <span class="mono" id="cWarn">0</span></button>
+          <button class="chip info" aria-pressed="false" data-sev="info" type="button">Observaciones <span class="mono" id="cInfo">0</span></button>
+          <select id="catSel" aria-label="Categoría"></select>
+          <input type="search" id="q" placeholder="Buscar documento, RIF, texto…" aria-label="Buscar">
+        </div>
+        <div class="tablewrap" style="max-height:620px;overflow:auto"><table id="findTbl"></table></div>
+        <div class="row" style="justify-content:space-between"><span class="note" id="findCount"></span><button class="btn small" type="button" id="btnMore" hidden>Mostrar más</button></div>
+      </div>
+      <div class="panel">
+        <h2>Qué revisa el validador</h2>
+        <ul class="checks">
+          <li><b>Correlativos</b>Facturas, notas de débito y crédito por serie; saltos, duplicados, orden de fechas y continuidad con el período anterior.</li>
+          <li><b>N° de control</b>Secuencia por rango de imprenta y relación constante entre N° de documento y N° de control (estricta en forma preimpresa).</li>
+          <li><b>Máquina fiscal</b>Rangos de facturas por serial, solapes, reportes Z consecutivos por máquina y día.</li>
+          <li><b>Cálculos</b>Total = exento + base + IVA, IVA = base × alícuota, alícuotas permitidas, cuadre contra la fila de totales.</li>
+          <li><b>RIF y contribuyentes</b>Formato y dígito verificador del RIF; jurídicas en columna de no contribuyente.</li>
+          <li><b>Retenciones</b>Comprobante de 14 dígitos, período y fecha, 75 % o 100 % del IVA, duplicados y comprobantes ya declarados.</li>
+        </ul>
+      </div>
+    </main>
+  </section>
+
+  <!-- ======== HISTÓRICO ======== -->
+  <section id="viewHist" class="panel" hidden>
+    <div class="sectionhead">
+      <h2 id="histTitle">Histórico</h2>
+      <div class="row">
+        <button class="btn small" type="button" id="btnBackup" hidden>Exportar respaldo</button>
+        <button class="btn small" type="button" id="btnRestore">Importar respaldo</button>
+        <input type="file" id="restoreIn" accept=".json" hidden>
+      </div>
+    </div>
+    <p class="note" id="histNote"></p>
+    <div id="histBody"></div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ===== Motor de validación de Libros de Ventas (SENIAT) ===== */
+const VLV = (function () {
+  const FIELDS = [
+    ['fecha', 'Fecha del documento'], ['serie', 'Serie / Serial máquina fiscal'], ['rif', 'RIF / C.I.'], ['nombre', 'Nombre o razón social'],
+    ['factura', 'N° factura'], ['nd', 'N° nota de débito'], ['nc', 'N° nota de crédito'], ['control', 'N° control / Reporte Z'],
+    ['afectada', 'N° factura afectada'],
+    ['c_total', 'Contribuyente · total con IVA'], ['c_exento', 'Contribuyente · exento / no sujeto'], ['c_base', 'Contribuyente · base imponible'],
+    ['c_alic', 'Contribuyente · % alícuota'], ['c_iva', 'Contribuyente · IVA'],
+    ['c_base2', 'Contribuyente · base 2ª alícuota'], ['c_alic2', 'Contribuyente · % 2ª alícuota'], ['c_iva2', 'Contribuyente · IVA 2ª alícuota'],
+    ['n_total', 'No contribuyente · total con IVA'], ['n_exento', 'No contribuyente · exento / no sujeto'], ['n_base', 'No contribuyente · base imponible'],
+    ['n_alic', 'No contribuyente · % alícuota'], ['n_iva', 'No contribuyente · IVA'],
+    ['n_base2', 'No contribuyente · base 2ª alícuota'], ['n_alic2', 'No contribuyente · % 2ª alícuota'], ['n_iva2', 'No contribuyente · IVA 2ª alícuota'],
+    ['comprobante', 'N° comprobante de retención'], ['fcomp', 'Fecha del comprobante'], ['retenido', 'IVA retenido por el comprador']
+  ];
+  // Formato del sistema (33 columnas, sin encabezado; última fila = resumen)
+  const DEFAULT_MAP = {
+    fecha: 0, serie: 1, rif: 2, nombre: 3, factura: 4, nd: 5, nc: 6, control: 7, afectada: 8,
+    c_total: 10, c_exento: 11, c_base: 12, c_alic: 13, c_iva: 14, c_base2: 15, c_alic2: 16, c_iva2: 17,
+    n_total: 20, n_exento: 21, n_base: 22, n_alic: 23, n_iva: 24, n_base2: 25, n_alic2: 26, n_iva2: 27,
+    comprobante: 30, fcomp: 31, retenido: 32
+  };
+  const TIPOS = {
+    AUTO: 'Detectar automáticamente', MF: 'Solo máquina fiscal', MIX: 'Máquina fiscal + forma libre',
+    FL: 'Solo forma libre', FP: 'Forma preimpresa'
+  };
+  const DEFAULT_CFG = { tol: 0.05, alicuotas: [0, 8, 16, 31], maxGap: 500, retPct: [75, 100] };
+
+  /* ---------- utilidades ---------- */
+  const s = v => (v === null || v === undefined) ? '' : String(v).trim();
+  const num = v => {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
+    let t = String(v).trim().replace(/\s/g, '');
+    if (!t) return 0;
+    if (/^-?[\d.]+,\d+$/.test(t)) t = t.replace(/\./g, '').replace(',', '.');
+    else t = t.replace(/,/g, '');
+    const n = parseFloat(t);
+    return isFinite(n) ? n : 0;
+  };
+  const r2 = n => Math.round(n * 100) / 100;
+  function parseDate(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (v instanceof Date && !isNaN(v)) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+    if (typeof v === 'number' && v > 20000 && v < 80000) { // serial Excel
+      const d = new Date(Math.round((v - 25569) * 86400000));
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+    const t = String(v).trim();
+    let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if (m) {
+      let y = +m[3]; if (y < 100) y += 2000;
+      const d = new Date(y, +m[2] - 1, +m[1]);
+      if (d.getDate() === +m[1] && d.getMonth() === +m[2] - 1) return d;
+      return null;
+    }
+    m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    return null;
+  }
+  const fmtD = d => d ? String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear() : '';
+  const ymd = d => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  // "A42544" -> {prefix:"A", n:42544, w:5}; "00-0208709" -> {prefix:"00-", n:208709, w:7}
+  function splitNum(t) {
+    t = s(t).toUpperCase();
+    const m = t.match(/^(.*?)(\d+)$/);
+    if (!m) return null;
+    return { prefix: m[1].replace(/\s/g, ''), n: parseInt(m[2], 10), w: m[2].length, raw: t };
+  }
+  // rango de máquina fiscal "00055575- 00055576" o "0760-0761"
+  function parseRange(t) {
+    t = s(t);
+    const m = t.match(/^(\D*?)(\d+)\s*[-–]\s*(\D*?)(\d+)$/);
+    if (m && !/^\d{2}$/.test(m[2]) ) {
+      const a = parseInt(m[2], 10), b = parseInt(m[4], 10);
+      if (b >= a && b - a < 100000) return { from: a, to: b, w: m[2].length, prefix: m[1] };
+    }
+    const one = splitNum(t);
+    if (!one) return null;
+    return { from: one.n, to: one.n, w: one.w, prefix: one.prefix };
+  }
+  const normKey = t => { const p = splitNum(t); return p ? p.prefix + '#' + p.n : s(t).toUpperCase(); };
+  const isSerial = t => /^[A-Z]{2,4}\d{6,9}$/.test(s(t).toUpperCase());
+
+  // RIF venezolano
+  const LETRA = { V: 1, E: 2, J: 3, P: 4, G: 5, C: 3 };
+  function checkRif(raw) {
+    const t = s(raw).toUpperCase().replace(/[\s\-.]/g, '');
+    if (!t) return { ok: false, empty: true };
+    const m = t.match(/^([VEJPGC])(\d+)$/);
+    if (!m) return { ok: false, msg: 'formato inválido (debe ser letra V/E/J/P/G/C seguida de dígitos)' };
+    const L = m[1], d = m[2];
+    if (d.length === 9) {
+      const w = [3, 2, 7, 6, 5, 4, 3, 2];
+      let sum = LETRA[L] * 4;
+      for (let i = 0; i < 8; i++) sum += (+d[i]) * w[i];
+      let dv = 11 - (sum % 11); if (dv >= 10) dv = 0;
+      if (dv !== +d[8]) return { ok: true, warnDv: true, letra: L, norm: t, msg: 'el dígito verificador no coincide (esperado ' + dv + ')' };
+      return { ok: true, letra: L, norm: t };
+    }
+    if ((L === 'V' || L === 'E') && d.length >= 6 && d.length <= 8) return { ok: true, letra: L, norm: t, cedula: true };
+    return { ok: false, msg: 'longitud inválida (' + d.length + ' dígitos)' };
+  }
+
+  /* ---------- lectura ---------- */
+  const SYN = {
+    fecha: [/^fecha( de la)?( factura| documento| emisi)?/], rif: [/rif|c\.?i\.?\b|cedula|cédula/], nombre: [/nombre|raz[oó]n social|cliente/],
+    factura: [/(n[°ºo.]*|numero|número).{0,4}factura$|^factura$|^n.{0,3}fact/], nd: [/d[eé]bito/], nc: [/cr[eé]dito/],
+    control: [/control|reporte z|z\b/], afectada: [/afectad/], serie: [/serial|serie|m[aá]quina/],
+    comprobante: [/comprobante/], retenido: [/retenid/],
+    total: [/total/], exento: [/exent|no sujet|no gravad/], base: [/base/], alic: [/al[ií]cuota|%|tasa/], iva: [/^i\.?v\.?a\.?$|impuesto|d[eé]bito fiscal/]
+  };
+  function detectHeader(rows) {
+    for (let r = 0; r < Math.min(rows.length, 20); r++) {
+      const row = rows[r] || [];
+      const labels = row.map(c => s(c).toLowerCase());
+      if (labels.some(l => parseDate(l)) || row.some(c => typeof c === 'number' && c !== 0)) continue; // filas de datos o de totales
+      const map = {}; let hits = 0; const seen = {};
+      labels.forEach((l, i) => {
+        if (!l || l.length > 60) return;
+        const tryF = (f, key) => {
+          if (SYN[key].some(rx => rx.test(l))) { return true; } return false;
+        };
+        if (tryF(0, 'comprobante') && /fecha/.test(l)) { if (map.fcomp === undefined) { map.fcomp = i; hits++; } return; }
+        if (tryF(0, 'comprobante')) { if (map.comprobante === undefined) { map.comprobante = i; hits++; } return; }
+        if (tryF(0, 'retenido')) { if (map.retenido === undefined) { map.retenido = i; hits++; } return; }
+        if (tryF(0, 'afectada')) { if (map.afectada === undefined) { map.afectada = i; hits++; } return; }
+        for (const key of ['fecha', 'rif', 'nombre', 'nd', 'nc', 'factura', 'control', 'serie']) {
+          if (map[key] === undefined && SYN[key].some(rx => rx.test(l))) { map[key] = i; hits++; return; }
+        }
+        for (const key of ['total', 'exento', 'base', 'alic', 'iva']) {
+          if (SYN[key].some(rx => rx.test(l))) {
+            seen[key] = (seen[key] || 0) + 1;
+            const pre = seen[key] === 1 ? 'c_' : seen[key] === 2 ? 'n_' : null;
+            if (pre) { map[pre + key] = i; hits++; }
+            return;
+          }
+        }
+      });
+      if (hits >= 5 && map.fecha !== undefined && (map.c_base !== undefined || map.c_iva !== undefined)) return { row: r, map };
+    }
+    return null;
+  }
+
+  /* Detecta la estructura del formato sin encabezado (33, 34 o más columnas):
+     bloques contribuyente / no contribuyente separados por columnas vacías,
+     retención en las 3 últimas columnas, y verificación base × % = IVA con los datos. */
+  function inferLayout(rows) {
+    const data = rows.filter(r => r && parseDate(r[0])).slice(0, 800);
+    if (!data.length) return null;
+    const width = Math.max(...rows.filter(Boolean).map(r => r.length));
+    if (width < 25) return null;
+    const isEmpty = c => data.every(r => r[c] === null || r[c] === undefined || String(r[c]).trim() === '');
+    const empties = []; for (let c = 9; c < width; c++) if (isEmpty(c)) empties.push(c);
+    const sep1 = empties.find(c => c >= 15);
+    if (sep1 === undefined) return null;
+    const sep2 = empties.find(c => c > sep1 + 5);
+    if (sep2 === undefined) return null;
+    const map = { fecha: 0, serie: 1, rif: 2, nombre: 3, factura: 4, nd: 5, nc: 6, control: 7, afectada: 8 };
+    const block = (st, en, p) => {
+      Object.assign(map, { [p + 'total']: st + 1, [p + 'exento']: en - 6, [p + 'base']: en - 5, [p + 'alic']: en - 4, [p + 'iva']: en - 3, [p + 'base2']: en - 2, [p + 'alic2']: en - 1, [p + 'iva2']: en });
+      // ajustar con los datos: buscar la terna base, %, IVA que cumpla base × % = IVA
+      const fits = j => { let ok = 0, bad = 0; data.forEach(r => { const b = num(r[j]), a = num(r[j + 1]), i = num(r[j + 2]); if (!b && !i) return; if (a > 0 && a <= 50 && Math.abs(b * a / 100 - i) <= Math.max(0.05, Math.abs(i) * 0.001)) ok++; else bad++; }); return { ok, bad }; };
+      const cur = fits(map[p + 'base']);
+      if (cur.bad > cur.ok) {
+        for (let j = st; j <= en - 2; j++) { const f = fits(j); if (f.ok > 0 && f.ok >= f.bad * 3) { map[p + 'base'] = j; map[p + 'alic'] = j + 1; map[p + 'iva'] = j + 2; map[p + 'exento'] = j - 1 > st + 1 ? j - 1 : -1; break; } }
+      }
+    };
+    block(9, sep1 - 1, 'c_');
+    block(sep1 + 1, sep2 - 1, 'n_');
+    map.retenido = width - 1; map.fcomp = width - 2; map.comprobante = width - 3;
+    return { map, width };
+  }
+
+  function readRows(rows, mapping) {
+    const hdr = mapping ? null : detectHeader(rows);
+    const inf = (mapping || hdr) ? null : inferLayout(rows);
+    const map = mapping || (hdr ? hdr.map : inf ? inf.map : DEFAULT_MAP);
+    const out = []; let summary = null;
+    const start = hdr ? hdr.row + 1 : 0;
+    const g = (row, f) => map[f] === undefined || map[f] === null || map[f] < 0 ? null : row[map[f]];
+    for (let i = start; i < rows.length; i++) {
+      const row = rows[i]; if (!row || !row.length) continue;
+      const fecha = parseDate(g(row, 'fecha'));
+      if (!fecha) {
+        const txt = row.map(s).join(' ').toLowerCase();
+        if (/total|base imponible|d[eé]bito fiscal/.test(txt) && row.some(c => typeof c === 'number' && c !== 0)) summary = { rowNum: i + 1, cells: row };
+        continue;
+      }
+      const R = { rowNum: i + 1, fecha };
+      for (const [f] of FIELDS) {
+        if (f === 'fecha') continue;
+        const v = g(row, f);
+        if (/^(c_|n_)|retenido/.test(f)) R[f] = num(v); else { const t = s(v); R[f] = (f !== 'nombre' && f !== 'fecha' && /^0+([.,]0+)?$/.test(t)) ? '' : t; }
+      }
+      R.fcompD = parseDate(R.fcomp);
+      out.push(R);
+    }
+    return { rows: out, summary, map, header: hdr ? hdr.row + 1 : 0, usedDefault: !mapping && !hdr && !inf, inferred: inf ? inf.width : 0 };
+  }
+
+  // Resumen del sistema: pares (etiqueta, base, débito) y total retenido
+  function parseSummary(sm) {
+    if (!sm) return null;
+    const c = sm.cells; const res = { pairs: {}, retenido: null, rowNum: sm.rowNum };
+    let lastIdx = -1;
+    for (let i = 0; i < c.length; i++) {
+      const l = s(c[i]);
+      if (l && isNaN(num(l)) || (l && !/^-?[\d.,]+$/.test(l))) {
+        if (typeof c[i + 1] === 'number' && typeof c[i + 2] === 'number') { res.pairs[l] = [c[i + 1], c[i + 2]]; lastIdx = i + 2; }
+      }
+    }
+    for (let i = c.length - 1; i > lastIdx; i--) if (typeof c[i] === 'number') { res.retenido = c[i]; break; }
+    const totKey = Object.keys(res.pairs).find(k => /total ventas y d[eé]bitos/i.test(k));
+    res.total = totKey ? res.pairs[totKey] : null;
+    return res;
+  }
+
+  /* ---------- período ---------- */
+  function detectPeriod(rows) {
+    const cnt = {}; rows.forEach(r => { if (r.factura || r.nd || r.nc) { const k = r.fecha.getFullYear() + '-' + (r.fecha.getMonth() + 1); cnt[k] = (cnt[k] || 0) + 1; } });
+    const best = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+    if (!best) return null;
+    const [y, m] = best[0].split('-').map(Number);
+    const days = rows.filter(r => (r.factura || r.nd || r.nc) && r.fecha.getFullYear() === y && r.fecha.getMonth() + 1 === m).map(r => r.fecha.getDate());
+    const mx = Math.max(...days), mn = Math.min(...days);
+    const t = mx <= 15 ? 'Q1' : mn >= 16 ? 'Q2' : 'M';
+    return makePeriod(y, m, t);
+  }
+  function makePeriod(y, m, t) {
+    const last = new Date(y, m, 0).getDate();
+    const start = new Date(y, m - 1, t === 'Q2' ? 16 : 1), end = new Date(y, m - 1, t === 'Q1' ? 15 : last);
+    const key = y + '-' + String(m).padStart(2, '0') + '-' + t;
+    const label = (t === 'M' ? '' : t === 'Q1' ? '1ª quincena de ' : '2ª quincena de ') + MESES[m - 1] + ' ' + y;
+    return { y, m, t, key, start, end, label, ym: y * 100 + m };
+  }
+  function periodFromKey(k) { const [y, m, t] = k.split('-'); return makePeriod(+y, +m, t); }
+  function expectedPrev(p) {
+    if (p.t === 'Q2') return [makePeriod(p.y, p.m, 'Q1').key];
+    const y = p.m === 1 ? p.y - 1 : p.y, m = p.m === 1 ? 12 : p.m - 1;
+    return [makePeriod(y, m, 'M').key, makePeriod(y, m, 'Q2').key];
+  }
+
+  /* ---------- helpers de correlativos ---------- */
+  function compress(nums) { // [1,2,3,7] -> "1–3, 7"
+    const out = []; let a = null, b = null;
+    nums.forEach(n => { if (a === null) { a = b = n; } else if (n === b + 1) b = n; else { out.push(a === b ? a : a + '–' + b); a = b = n; } });
+    if (a !== null) out.push(a === b ? a : a + '–' + b);
+    return out;
+  }
+  function missingList(a, b, cap) { const out = []; for (let n = a; n <= b && out.length < cap; n++) out.push(n); return out; }
+  const pad = (n, w) => String(n).padStart(w || 0, '0');
+
+  /* ---------- validación ---------- */
+  function validate(parsed, opts) {
+    const cfg = Object.assign({}, DEFAULT_CFG, opts.cfg || {});
+    const rows = parsed.rows;
+    const period = opts.period || detectPeriod(rows);
+    const hist = opts.history || null; // {prev:{key,state}, index: Map normKey->[{...}], retIndex: Map, periods:[keys]}
+    const F = [];
+    const add = (sev, cat, msg, r, doc) => F.push({ sev, cat, msg, row: r ? r.rowNum : null, doc: doc || (r ? docLabel(r) : ''), fecha: r ? fmtD(r.fecha) : '' });
+    const tol = cfg.tol;
+
+    // clasificación
+    let nMaq = 0, nFL = 0;
+    rows.forEach(r => {
+      r.tipoDoc = r.factura ? 'FAC' : r.nd ? 'ND' : r.nc ? 'NC' : (r.afectada && (r.comprobante || r.retenido)) ? 'RET' : 'NADA';
+      r.num = r.factura || r.nd || r.nc || '';
+      r.maquina = isSerial(r.serie);
+      r.anulada = /anulad/i.test(r.nombre);
+      r.resumen = /resumen/i.test(r.nombre);
+      r.cAny = [r.c_total, r.c_exento, r.c_base, r.c_iva, r.c_base2, r.c_iva2].some(v => Math.abs(v) > 0.000001);
+      r.nAny = [r.n_total, r.n_exento, r.n_base, r.n_iva, r.n_base2, r.n_iva2].some(v => Math.abs(v) > 0.000001);
+      r.iva = r.c_iva + r.c_iva2 + r.n_iva + r.n_iva2;
+      r.base = r.c_base + r.c_base2 + r.n_base + r.n_base2;
+      r.exento = r.c_exento + r.n_exento;
+      r.total = r.c_total + r.n_total;
+      if (r.tipoDoc !== 'RET' && r.tipoDoc !== 'NADA') { if (r.maquina) nMaq++; else nFL++; }
+    });
+    let tipo = opts.tipo || 'AUTO';
+    const detected = nMaq && nFL ? 'MIX' : nMaq ? 'MF' : 'FL';
+    if (tipo === 'AUTO') tipo = detected;
+
+    // tipo de facturación vs contenido
+    if ((tipo === 'FL' || tipo === 'FP') && nMaq) add('error', 'Tipo de facturación', nMaq + ' documento(s) emitidos por máquina fiscal en una empresa configurada como ' + TIPOS[tipo].toLowerCase() + '.', null, '');
+    if (tipo === 'MF' && nFL) add('error', 'Tipo de facturación', nFL + ' documento(s) de forma libre / preimpresa en una empresa configurada solo con máquina fiscal.', null, '');
+    if (tipo === 'MIX' && (!nMaq || !nFL)) add('info', 'Tipo de facturación', 'La empresa está configurada como máquina fiscal + forma libre, pero este libro solo trae documentos de ' + (nMaq ? 'máquina fiscal' : 'forma libre') + '.', null, '');
+
+    // índice del período actual
+    const curIndex = new Map();
+    rows.forEach(r => {
+      if (r.tipoDoc === 'RET' || r.tipoDoc === 'NADA') return;
+      if (r.maquina) {
+        const rg = parseRange(r.num);
+        if (rg && rg.from === rg.to) { const k = normKey(r.num); (curIndex.get(k) || curIndex.set(k, []).get(k)).push({ r, rif: r.rif, iva: r.iva, t: r.tipoDoc }); }
+      } else { const k = normKey(r.num); (curIndex.get(k) || curIndex.set(k, []).get(k)).push({ r, rif: r.rif, iva: r.iva, t: r.tipoDoc }); }
+    });
+
+    /* --- validaciones por fila --- */
+    const retSeen = new Map();
+    rows.forEach(r => {
+      const doc = docLabel(r);
+      // fecha / período
+      if (period && r.tipoDoc !== 'RET') {
+        if (r.fecha < period.start) add('warn', 'Fechas', 'Documento con fecha ' + fmtD(r.fecha) + ', anterior al período (' + period.label + '). Verifique si es un registro extemporáneo.', r);
+        if (r.fecha > period.end) add('error', 'Fechas', 'Documento con fecha ' + fmtD(r.fecha) + ', posterior al cierre del período.', r);
+      }
+      if (r.tipoDoc === 'NADA') { add('error', 'Identificación', 'La fila no tiene número de factura, nota de débito ni nota de crédito.', r); return; }
+      const nDocs = [r.factura, r.nd, r.nc].filter(Boolean).length;
+      if (nDocs > 1) add('error', 'Identificación', 'La fila trae más de un número de documento (factura / ND / NC) a la vez.', r);
+
+      // RIF y nombre
+      const rif = checkRif(r.rif);
+      if (!r.anulada && !r.resumen) {
+        if (rif.empty) { if (r.cAny) add('error', 'RIF', 'Venta a contribuyente sin RIF del comprador.', r); }
+        else if (!rif.ok) add('error', 'RIF', 'RIF "' + r.rif + '": ' + rif.msg + '.', r);
+        else if (rif.warnDv) add('warn', 'RIF', 'RIF ' + r.rif + ': ' + rif.msg + '.', r);
+        if (!r.nombre) add('error', 'Identificación', 'Falta el nombre o razón social del comprador.', r);
+      }
+      if (r.nAny && rif.ok && (rif.letra === 'J' || rif.letra === 'G') && r.tipoDoc !== 'RET') add('warn', 'Contribuyente', 'Persona jurídica (' + r.rif + ') registrada en la columna de no contribuyentes.', r);
+      if (r.cAny && r.nAny) add('warn', 'Contribuyente', 'La fila tiene montos en contribuyente y no contribuyente a la vez.', r);
+      if (r.resumen && !r.maquina) add('warn', 'Máquina fiscal', '"Resumen del día" registrado sin serial de máquina fiscal.', r);
+
+      // anuladas
+      if (r.anulada) {
+        if (Math.abs(r.total) + Math.abs(r.base) + Math.abs(r.iva) + Math.abs(r.retenido) > 0.009) add('error', 'Anuladas', 'Documento anulado con montos distintos de cero.', r);
+      }
+      // documento de forma libre: control obligatorio; máquina: Z obligatorio
+      if (r.tipoDoc !== 'RET') {
+        if (r.maquina) { if (!r.control) add('error', 'Máquina fiscal', 'Falta el número de reporte Z.', r); }
+        else if (!r.control) add('error', 'N° de control', 'Documento de forma libre sin número de control.', r);
+        else if (!splitNum(r.control)) add('error', 'N° de control', 'Número de control "' + r.control + '" no tiene parte numérica.', r);
+      }
+      // notas
+      if ((r.tipoDoc === 'NC' || r.tipoDoc === 'ND') && !r.afectada && !r.anulada) add('error', 'Notas', (r.tipoDoc === 'NC' ? 'Nota de crédito' : 'Nota de débito') + ' sin número de factura afectada.', r);
+      if (r.tipoDoc === 'NC' && !r.anulada && r.total > 0.009) add('warn', 'Notas', 'Nota de crédito con monto positivo; debería restar del débito fiscal.', r);
+      if ((r.tipoDoc === 'FAC' || r.tipoDoc === 'ND') && r.total < -0.009) add('error', 'Montos', (r.tipoDoc === 'FAC' ? 'Factura' : 'Nota de débito') + ' con monto negativo.', r);
+      if (r.tipoDoc === 'FAC' && r.afectada && !r.maquina) add('info', 'Notas', 'Factura con número de factura afectada (' + r.afectada + '); revise si corresponde a una nota.', r);
+      if ((r.tipoDoc === 'NC' || r.tipoDoc === 'ND') && r.afectada && !r.anulada) {
+        const k = normKey(r.afectada);
+        const found = (curIndex.get(k) || []).filter(x => x.t === 'FAC');
+        const h = hist && hist.index.get(k);
+        if (!found.length && !(h && h.length) && !r.maquina) add(hist && hist.loaded ? 'warn' : 'info', 'Notas', 'La factura afectada ' + r.afectada + ' no está en este libro' + (hist && hist.loaded ? ' ni en el histórico cargado.' : ' (no hay histórico para buscarla).'), r);
+        const ref = found[0] || (h && h[0]);
+        if (ref && ref.rif && r.rif && checkRif(ref.rif).norm !== rif.norm) add('warn', 'Notas', 'El RIF de la nota (' + r.rif + ') no coincide con el de la factura afectada ' + r.afectada + ' (' + ref.rif + ').', r);
+      }
+
+      // aritmética
+      if (r.tipoDoc !== 'RET') {
+        [['c', 'contribuyente'], ['n', 'no contribuyente']].forEach(([p, nm]) => {
+          const T = r[p + '_total'], E = r[p + '_exento'], B = r[p + '_base'], A = r[p + '_alic'], I = r[p + '_iva'];
+          const B2 = r[p + '_base2'], A2 = r[p + '_alic2'], I2 = r[p + '_iva2'];
+          if (![T, E, B, I, B2, I2].some(v => Math.abs(v) > 0.000001)) return;
+          const sum = E + B + I + B2 + I2;
+          if (Math.abs(T - sum) > tol) add('error', 'Cálculos', 'Total ' + nm + ' ' + fmtN(T) + ' ≠ exento + base + IVA (' + fmtN(sum) + '). Diferencia ' + fmtN(T - sum) + '.', r);
+          [[B, A, I, ''], [B2, A2, I2, ' (2ª alícuota)']].forEach(([b, a, i, lbl]) => {
+            if (Math.abs(b) < 0.000001 && Math.abs(i) < 0.000001) return;
+            if (Math.abs(b) > 0 && !a) { add('error', 'Cálculos', 'Base imponible ' + nm + lbl + ' sin alícuota.', r); return; }
+            if (a && !cfg.alicuotas.includes(+a)) add('error', 'Alícuotas', 'Alícuota ' + a + '% no permitida (' + cfg.alicuotas.join(', ') + '%).', r);
+            const exp = r2(b * a / 100);
+            if (Math.abs(exp - i) > tol) add('error', 'Cálculos', 'IVA ' + nm + lbl + ' ' + fmtN(i) + ' ≠ base × ' + a + '% (' + fmtN(exp) + '). Diferencia ' + fmtN(i - exp) + '.', r);
+          });
+        });
+      }
+
+      // retenciones
+      if (Math.abs(r.retenido) > 0.000001 || r.comprobante) {
+        if (!r.comprobante) add('error', 'Retenciones', 'IVA retenido ' + fmtN(r.retenido) + ' sin número de comprobante.', r);
+        else if (!/^\d{14}$/.test(r.comprobante.replace(/\D/g, '')) || r.comprobante.replace(/\D/g, '').length !== r.comprobante.length) add('error', 'Retenciones', 'Comprobante "' + r.comprobante + '" no tiene el formato de 14 dígitos (AAAAMM + 8 dígitos).', r);
+        else {
+          const cy = +r.comprobante.slice(0, 4), cm = +r.comprobante.slice(4, 6);
+          if (cm < 1 || cm > 12 || cy < 2000) add('error', 'Retenciones', 'Comprobante ' + r.comprobante + ' con año/mes inválido.', r);
+          else if (period && cy * 100 + cm > period.ym) add('error', 'Retenciones', 'Comprobante ' + r.comprobante + ' es de un período posterior al libro.', r);
+          if (r.fcompD && cy * 100 + cm !== r.fcompD.getFullYear() * 100 + r.fcompD.getMonth() + 1) add('warn', 'Retenciones', 'El período del comprobante (' + r.comprobante.slice(0, 6) + ') no coincide con su fecha (' + fmtD(r.fcompD) + ').', r);
+        }
+        if (Math.abs(r.retenido) < 0.000001 && r.comprobante) add('error', 'Retenciones', 'Comprobante ' + r.comprobante + ' registrado sin monto retenido.', r);
+        if (r.comprobante && !r.fcompD) add('error', 'Retenciones', 'Falta o es inválida la fecha del comprobante.', r);
+        else if (r.fcompD && period && r.fcompD > period.end) add('error', 'Retenciones', 'Fecha del comprobante ' + fmtD(r.fcompD) + ' posterior al cierre del período.', r);
+        else if (r.fcompD && period && (period.ym - (r.fcompD.getFullYear() * 100 + r.fcompD.getMonth() + 1)) > 1 && (period.y * 12 + period.m) - (r.fcompD.getFullYear() * 12 + r.fcompD.getMonth() + 1) > 1) add('info', 'Retenciones', 'Comprobante emitido el ' + fmtD(r.fcompD) + ' (antes del período); se declara en este período por haberse recibido ahora.', r);
+        if (rif.ok && !(rif.letra === 'J' || rif.letra === 'G') && !rif.cedula) add('warn', 'Retenciones', 'Agente de retención con RIF ' + r.rif + ' (normalmente J o G).', r);
+        if (rif.cedula || rif.empty) add('error', 'Retenciones', 'Retención registrada a un comprador sin RIF de contribuyente.', r);
+
+        // monto vs IVA del documento
+        let ivaRef = null, refFrom = '';
+        if (r.tipoDoc === 'RET') {
+          const k = normKey(r.afectada);
+          const cur = curIndex.get(k), h = hist && hist.index.get(k);
+          const ref = (cur && cur[0]) || (h && h[0]);
+          if (ref) {
+            ivaRef = ref.iva; refFrom = cur && cur[0] ? 'este libro' : 'el período ' + periodFromKey(ref.p).label;
+            if (ref.rif && rif.norm && checkRif(ref.rif).norm !== rif.norm) add('warn', 'Retenciones', 'El RIF del agente (' + r.rif + ') no coincide con el del documento ' + r.afectada + ' (' + ref.rif + ').', r);
+          } else add(hist && hist.loaded ? 'warn' : 'info', 'Retenciones', 'Retención sobre el documento ' + r.afectada + ', que no está en este libro' + (hist && hist.loaded ? ' ni en el histórico cargado.' : '. Cargue el histórico para verificar su IVA.'), r);
+        } else { ivaRef = r.iva; refFrom = 'el mismo documento'; }
+        if (ivaRef !== null && Math.abs(r.retenido) > 0) {
+          if (Math.abs(ivaRef) < 0.000001) add('error', 'Retenciones', 'IVA retenido ' + fmtN(r.retenido) + ' sobre un documento sin IVA (' + refFrom + ').', r);
+          else {
+            if (Math.abs(r.retenido) > Math.abs(ivaRef) + tol) add('error', 'Retenciones', 'IVA retenido ' + fmtN(r.retenido) + ' mayor que el IVA del documento ' + fmtN(ivaRef) + ' (' + refFrom + ').', r);
+            if (Math.sign(r.retenido) !== Math.sign(ivaRef)) add('warn', 'Retenciones', 'El signo del IVA retenido no coincide con el del documento (' + refFrom + ').', r);
+            const pct = Math.abs(r.retenido / ivaRef) * 100;
+            if (!cfg.retPct.some(p => Math.abs(pct - p) <= 1)) add('warn', 'Retenciones', 'Retención equivale al ' + pct.toFixed(2).replace('.', ',') + '% del IVA (' + refFrom + '); se esperaba ' + cfg.retPct.join('% o ') + '%.', r);
+          }
+        }
+        // duplicados de retención
+        const target = r.tipoDoc === 'RET' ? normKey(r.afectada) : normKey(r.num);
+        const kk = r.comprobante + '|' + target;
+        if (r.comprobante && retSeen.has(kk)) add('error', 'Retenciones', 'Retención duplicada: comprobante ' + r.comprobante + ' ya registrado en la fila ' + retSeen.get(kk) + ' para el mismo documento.', r);
+        else retSeen.set(kk, r.rowNum);
+        if (hist && hist.retIndex) {
+          const prev = hist.retIndex.get(r.comprobante + '|' + target);
+          if (prev) add('error', 'Retenciones', 'El comprobante ' + r.comprobante + ' ya fue declarado en ' + periodFromKey(prev).label + '.', r);
+        }
+      }
+    });
+
+    /* --- documentos duplicados contra histórico --- */
+    if (hist && hist.loaded) {
+      rows.forEach(r => {
+        if (r.tipoDoc === 'RET' || r.tipoDoc === 'NADA' || (r.maquina && /-/.test(r.num))) return;
+        const h = hist.index.get(normKey(r.num));
+        if (!h) return;
+        const same = h.find(x => x.t === r.tipoDoc && (r.maquina ? x.s === r.serie : true));
+        if (same) add('error', 'Correlativos', (r.tipoDoc === 'FAC' ? 'Factura' : r.tipoDoc === 'NC' ? 'Nota de crédito' : 'Nota de débito') + ' ' + r.num + ' ya fue registrada en ' + periodFromKey(same.p).label + '.', r);
+      });
+    }
+
+    /* --- correlativos --- */
+    const series = []; // resumen para la UI
+    const newState = { fl: {}, mf: {} };
+    const prevState = hist && hist.prev ? hist.prev.state : null;
+    const tipoNombre = { FAC: 'Facturas', ND: 'Notas de débito', NC: 'Notas de crédito', CTRL: 'N° de control' };
+
+    function checkSeq(items, keyBase, label, kind, strictDate) {
+      // items: [{n, w, prefix, r}]
+      items.sort((a, b) => a.n - b.n || a.r.rowNum - b.r.rowNum);
+      // agrupar en rangos (clusters)
+      const clusters = []; let cur = null;
+      items.forEach(it => {
+        if (!cur || it.n - cur.last > cfg.maxGap) { cur = { items: [], first: it.n, last: it.n }; clusters.push(cur); }
+        cur.items.push(it); cur.last = it.n;
+      });
+      clusters.forEach((c, ci) => {
+        const w = c.items[0].w, pre = c.items[0].prefix;
+        const fmt = n => pre + pad(n, w);
+        const miss = []; const dups = [];
+        for (let i = 1; i < c.items.length; i++) {
+          const a = c.items[i - 1], b = c.items[i];
+          if (b.n === a.n) dups.push(b);
+          else if (b.n > a.n + 1) {
+            const m = missingList(a.n + 1, b.n - 1, 2000);
+            miss.push(...m);
+            add('error', 'Correlativos', label + ': salto de correlativo entre ' + fmt(a.n) + ' y ' + fmt(b.n) + ' (faltan ' + (b.n - a.n - 1) + ': ' + compress(m).slice(0, 8).map(x => typeof x === 'number' ? fmt(x) : x.split('–').map(Number).map(fmt).join('–')).join(', ') + (compress(m).length > 8 ? '…' : '') + ').', b.r, fmt(b.n));
+          }
+          if (b.n > a.n && b.r.fecha < a.r.fecha && strictDate) add('warn', 'Correlativos', label + ': ' + fmt(b.n) + ' tiene fecha ' + fmtD(b.r.fecha) + ', anterior a ' + fmt(a.n) + ' (' + fmtD(a.r.fecha) + ').', b.r, fmt(b.n));
+        }
+        dups.forEach(d => add('error', 'Correlativos', label + ': número ' + fmt(d.n) + ' repetido en el libro.', d.r, fmt(d.n)));
+        // continuidad con el período anterior
+        const key = keyBase + '|' + pre;
+        let cont = null;
+        if (prevState) {
+          const prevC = ((kind === 'mf' ? prevState.mf : prevState.fl)[key] || []);
+          const match = prevC.find(p => c.first - p.last <= cfg.maxGap && c.first - p.last > -cfg.maxGap * 2);
+          if (match) {
+            const pf = (match.prefix || '') + pad(match.last, match.w);
+            if (c.first === match.last + 1) cont = { ok: true, prev: pf };
+            else if (c.first > match.last + 1) {
+              cont = { ok: false, prev: pf };
+              add('error', 'Continuidad', label + ': el período anterior terminó en ' + fmt(match.last) + ' y este libro empieza en ' + fmt(c.first) + ' (faltan ' + (c.first - match.last - 1) + ').', c.items[0].r, fmt(c.first));
+            } else {
+              cont = { ok: false, prev: pf, overlap: true };
+              add('error', 'Continuidad', label + ': este libro empieza en ' + fmt(c.first) + ', número ya usado en el período anterior (terminó en ' + fmt(match.last) + ').', c.items[0].r, fmt(c.first));
+            }
+          } else cont = { none: prevC.length > 0, prevAny: prevC.map(p => fmt(p.last)) };
+        }
+        const st = (kind === 'mf' ? newState.mf : newState.fl);
+        (st[key] = st[key] || []).push({ first: c.first, last: c.last, w, prefix: pre, lastDate: fmtD(c.items[c.items.length - 1].r.fecha) });
+        series.push({ kind, label: label + (clusters.length > 1 ? ' · rango ' + (ci + 1) : ''), key, from: fmt(c.first), to: fmt(c.last), count: c.items.length, missing: miss.length, dups: dups.length, cont });
+      });
+      // series sin continuidad en este período (venían del anterior)
+    }
+
+    // forma libre / preimpresa
+    const flGroups = {};
+    rows.forEach(r => {
+      if (r.maquina || r.tipoDoc === 'RET' || r.tipoDoc === 'NADA') return;
+      const p = splitNum(r.num);
+      if (!p) { add('error', 'Identificación', 'Número de documento "' + r.num + '" sin parte numérica.', r); return; }
+      const k = r.tipoDoc + '|' + (r.serie || 'Única') + '|' + p.prefix;
+      (flGroups[k] = flGroups[k] || []).push({ n: p.n, w: p.w, prefix: p.prefix, r });
+      const c = splitNum(r.control);
+      if (c) { const kc = 'CTRL|*|' + c.prefix; (flGroups[kc] = flGroups[kc] || []).push({ n: c.n, w: c.w, prefix: c.prefix, r, ctrl: true }); }
+    });
+    Object.keys(flGroups).sort().forEach(k => {
+      const [t, serie] = k.split('|');
+      const lbl = tipoNombre[t] + (t === 'CTRL' ? '' : ' · serie ' + serie);
+      checkSeq(flGroups[k], t + '|' + serie, lbl, 'fl', t !== 'CTRL');
+    });
+    // desfase N° documento ↔ N° control
+    {
+      const g = {};
+      rows.filter(r => !r.maquina && ['FAC', 'ND', 'NC'].includes(r.tipoDoc)).forEach(r => {
+        const a = splitNum(r.num), c = splitNum(r.control); if (!a || !c) return;
+        const k = r.tipoDoc + '|' + r.serie + '|' + a.prefix + '|' + c.prefix;
+        (g[k] = g[k] || []).push({ r, d: c.n - a.n, n: a.n });
+      });
+      Object.values(g).forEach(list => {
+        list.sort((x, y) => x.n - y.n);
+        let run = 0, cur = null;
+        list.forEach(it => {
+          if (cur === null || it.d === cur) { run++; cur = it.d; return; }
+          if (run >= 3) add(tipo === 'FP' ? 'error' : 'warn', 'N° de control', 'Cambia la relación entre N° de documento y N° de control (desfase ' + cur + ' → ' + it.d + '). En formatos ' + (tipo === 'FP' ? 'preimpresos' : 'de imprenta') + ' esto suele indicar un control saltado o mal asignado.', it.r);
+          cur = it.d; run = 1;
+        });
+      });
+    }
+
+    // máquina fiscal
+    const mfBySerial = {};
+    rows.forEach(r => { if (r.maquina && r.tipoDoc !== 'RET' && r.tipoDoc !== 'NADA') (mfBySerial[r.serie] = mfBySerial[r.serie] || []).push(r); });
+    const zInfo = [];
+    Object.keys(mfBySerial).sort().forEach(serial => {
+      const list = mfBySerial[serial];
+      ['FAC', 'NC', 'ND'].forEach(t => {
+        const ranges = [];
+        list.filter(r => r.tipoDoc === t).forEach(r => {
+          const rg = parseRange(r.num);
+          if (!rg) { add('error', 'Máquina fiscal', 'Número "' + r.num + '" no es un número ni un rango válido.', r); return; }
+          ranges.push({ ...rg, r });
+        });
+        if (!ranges.length) return;
+        ranges.sort((a, b) => a.from - b.from);
+        const w = ranges[0].w, pre = ranges[0].prefix || '';
+        const fmt = n => pre + pad(n, w);
+        let miss = 0, dups = 0, cnt = 0;
+        for (let i = 0; i < ranges.length; i++) {
+          const b = ranges[i]; cnt += b.to - b.from + 1;
+          if (!i) continue;
+          const a = ranges[i - 1];
+          if (b.from <= a.to) { dups++; add('error', 'Correlativos', 'Máquina ' + serial + ' · ' + tipoNombre[t] + ': el rango ' + b.r.num + ' se solapa con ' + a.r.num + ' (fila ' + a.r.rowNum + ').', b.r); }
+          else if (b.from > a.to + 1) { miss += b.from - a.to - 1; add('error', 'Correlativos', 'Máquina ' + serial + ' · ' + tipoNombre[t] + ': faltan ' + (b.from - a.to - 1) + ' número(s) entre ' + fmt(a.to) + ' y ' + fmt(b.from) + '.', b.r, fmt(b.from)); }
+          if (b.r.fecha < a.r.fecha) add('warn', 'Correlativos', 'Máquina ' + serial + ': ' + b.r.num + ' tiene fecha anterior a ' + a.r.num + '.', b.r);
+        }
+        const key = 'MF-' + t + '|' + serial;
+        let cont = null;
+        const first = ranges[0].from, last = Math.max(...ranges.map(x => x.to));
+        if (prevState && prevState.mf[key]) {
+          const p = prevState.mf[key][0];
+          const pf = fmt(p.last);
+          if (first === p.last + 1) cont = { ok: true, prev: pf };
+          else if (first > p.last + 1) { cont = { ok: false, prev: pf }; add('error', 'Continuidad', 'Máquina ' + serial + ' · ' + tipoNombre[t] + ': el período anterior terminó en ' + fmt(p.last) + ' y este empieza en ' + fmt(first) + ' (faltan ' + (first - p.last - 1) + ').', ranges[0].r); }
+          else { cont = { ok: false, prev: pf, overlap: true }; add('error', 'Continuidad', 'Máquina ' + serial + ' · ' + tipoNombre[t] + ': empieza en ' + fmt(first) + ', número ya usado en el período anterior (terminó en ' + fmt(p.last) + ').', ranges[0].r); }
+        } else if (prevState) cont = { none: true, prevAny: [] };
+        newState.mf[key] = [{ first, last, w, prefix: pre, lastDate: fmtD(ranges[ranges.length - 1].r.fecha) }];
+        series.push({ kind: 'mf', label: 'Máquina ' + serial + ' · ' + tipoNombre[t], key, from: fmt(first), to: fmt(last), count: cnt, missing: miss, dups, cont });
+      });
+      // reportes Z
+      const zs = new Map(); // n -> {dates:Set, rows}
+      list.forEach(r => {
+        const rg = parseRange(r.control); if (!rg) { if (r.control) add('error', 'Máquina fiscal', 'Reporte Z "' + r.control + '" inválido.', r); return; }
+        for (let n = rg.from; n <= rg.to; n++) { const z = zs.get(n) || { dates: new Set(), r, w: rg.w }; z.dates.add(fmtD(r.fecha)); zs.set(n, z); }
+      });
+      const zn = [...zs.keys()].sort((a, b) => a - b);
+      if (!zn.length) return;
+      const zw = zs.get(zn[0]).w; const zf = n => pad(n, zw);
+      let zMiss = 0;
+      for (let i = 1; i < zn.length; i++) if (zn[i] > zn[i - 1] + 1) { zMiss += zn[i] - zn[i - 1] - 1; add('error', 'Reportes Z', 'Máquina ' + serial + ': faltan reportes Z entre ' + zf(zn[i - 1]) + ' y ' + zf(zn[i]) + ' (' + compress(missingList(zn[i - 1] + 1, zn[i] - 1, 200)).join(', ') + ').', zs.get(zn[i]).r, 'Z ' + zf(zn[i])); }
+      zs.forEach((z, n) => { if (z.dates.size > 1) add('warn', 'Reportes Z', 'Máquina ' + serial + ': el reporte Z ' + zf(n) + ' aparece en varias fechas (' + [...z.dates].join(', ') + ').', z.r, 'Z ' + zf(n)); });
+      const byDate = {};
+      list.forEach(r => { const d = fmtD(r.fecha); (byDate[d] = byDate[d] || new Set()).add(r.control); });
+      Object.entries(byDate).forEach(([d, set]) => { if (set.size > 1) add('info', 'Reportes Z', 'Máquina ' + serial + ': el ' + d + ' tiene varios reportes Z (' + [...set].join(', ') + ').', null, serial); });
+      let zcont = null;
+      const zkey = 'Z|' + serial;
+      if (prevState && prevState.mf[zkey]) {
+        const p = prevState.mf[zkey][0];
+        if (zn[0] === p.last + 1) zcont = { ok: true, prev: zf(p.last) };
+        else { zcont = { ok: false, prev: zf(p.last), overlap: zn[0] <= p.last }; add('error', 'Continuidad', 'Máquina ' + serial + ': el último reporte Z del período anterior fue ' + zf(p.last) + ' y este libro empieza en ' + zf(zn[0]) + '.', zs.get(zn[0]).r, 'Z ' + zf(zn[0])); }
+      } else if (prevState) zcont = { none: true, prevAny: [] };
+      newState.mf[zkey] = [{ first: zn[0], last: zn[zn.length - 1], w: zw, prefix: '' }];
+      series.push({ kind: 'z', label: 'Máquina ' + serial + ' · Reportes Z', key: zkey, from: zf(zn[0]), to: zf(zn[zn.length - 1]), count: zn.length, missing: zMiss, dups: 0, cont: zcont, days: Object.keys(byDate).length });
+    });
+
+    // series del período anterior que no aparecen en este
+    if (prevState) {
+      const seen = new Set(series.map(x => x.key));
+      ['fl', 'mf'].forEach(kind => Object.keys(prevState[kind] || {}).forEach(k => {
+        if (!seen.has(k) && !/^CTRL/.test(k)) {
+          const p = prevState[kind][k]; const last = p[p.length - 1];
+          F.push({ sev: 'info', cat: 'Continuidad', msg: 'La serie ' + k.replace(/\|/g, ' · ').replace('MF-', 'Máquina ').replace(/^FAC/, 'Facturas').replace(/^NC/, 'Notas de crédito').replace(/^ND/, 'Notas de débito') + ' tuvo movimiento en el período anterior (hasta ' + (last.prefix || '') + pad(last.last, last.w) + ') y no aparece en este libro.', row: null, doc: '', fecha: '' });
+          // arrastrar el estado para el siguiente período
+          if (kind === 'fl') newState.fl[k] = p; else newState.mf[k] = p;
+        }
+      }));
+    }
+
+    /* --- totales --- */
+    const tot = { docs: 0, fac: 0, nc: 0, nd: 0, ret: 0, anuladas: 0, base: 0, iva: 0, exento: 0, total: 0, retenido: 0, cBase: 0, cIva: 0, nBase: 0, nIva: 0, byAlic: {} };
+    rows.forEach(r => {
+      if (r.tipoDoc === 'FAC') tot.fac++; else if (r.tipoDoc === 'NC') tot.nc++; else if (r.tipoDoc === 'ND') tot.nd++; else if (r.tipoDoc === 'RET') tot.ret++;
+      if (r.anulada) tot.anuladas++;
+      tot.base += r.base; tot.iva += r.iva; tot.exento += r.exento; tot.total += r.total; tot.retenido += r.retenido;
+      tot.cBase += r.c_base + r.c_base2; tot.cIva += r.c_iva + r.c_iva2; tot.nBase += r.n_base + r.n_base2; tot.nIva += r.n_iva + r.n_iva2;
+      [[r.c_base, r.c_alic, r.c_iva], [r.c_base2, r.c_alic2, r.c_iva2], [r.n_base, r.n_alic, r.n_iva], [r.n_base2, r.n_alic2, r.n_iva2]].forEach(([b, a, i]) => {
+        if (!b && !i) return; const k = String(+a || 0); const o = tot.byAlic[k] = tot.byAlic[k] || { base: 0, iva: 0 }; o.base += b; o.iva += i;
+      });
+    });
+    tot.docs = tot.fac + tot.nc + tot.nd;
+    const sm = parseSummary(parsed.summary);
+    if (sm) {
+      const chk = (name, a, b) => { if (b !== null && b !== undefined && Math.abs(a - b) > Math.max(tol, 0.01)) add('error', 'Totales', 'El resumen del libro indica ' + name + ' ' + fmtN(b) + ', pero la suma de las filas da ' + fmtN(a) + ' (diferencia ' + fmtN(a - b) + ').', null, 'Resumen (fila ' + sm.rowNum + ')'); };
+      if (sm.total) { chk('base imponible total', tot.base, sm.total[0]); chk('débito fiscal total', tot.iva, sm.total[1]); }
+      chk('IVA retenido total', tot.retenido, sm.retenido);
+      Object.entries(sm.pairs).forEach(([l, v]) => {
+        const m = l.match(/(\d+)\s*%/);
+        if (m && /general \d+ ?%/i.test(l)) { const o = tot.byAlic[m[1]] || { base: 0, iva: 0 }; chk('base al ' + m[1] + '%', o.base, v[0]); chk('débito al ' + m[1] + '%', o.iva, v[1]); }
+      });
+      add('info', 'Totales', 'La fila ' + sm.rowNum + ' es la fila de totales del libro: no se valida como documento, solo se usa para cruzar los totales.', null, 'Totales (fila ' + sm.rowNum + ')');
+    } else add('info', 'Totales', 'No se encontró la fila de totales del libro; no se pudo cruzar contra el resumen.', null, '');
+
+    // histórico
+    if (hist && hist.prevNote) add(hist.prevNote.sev, 'Continuidad', hist.prevNote.msg, null, '');
+
+    // orden por severidad
+    const sevOrder = { error: 0, warn: 1, info: 2 };
+    F.sort((a, b) => sevOrder[a.sev] - sevOrder[b.sev] || (a.row || 0) - (b.row || 0));
+    return { findings: F, series, totals: tot, summary: sm, period, tipo, detected, newState, rows };
+  }
+
+  /* --- índice compacto para el histórico --- */
+  function buildIndex(rows) {
+    const docs = [], rets = [];
+    rows.forEach(r => {
+      if (['FAC', 'ND', 'NC'].includes(r.tipoDoc) && !(r.maquina && /-/.test(r.num))) docs.push([r.tipoDoc, r.maquina ? r.serie : '', r.num, checkRif(r.rif).norm || r.rif, r2(r.iva), fmtD(r.fecha)].join('|'));
+      if (r.comprobante) rets.push([r.comprobante, r.tipoDoc === 'RET' ? normKey(r.afectada) : normKey(r.num), r2(r.retenido)].join('|'));
+    });
+    return { docs, rets };
+  }
+  function loadIndex(chunks) { // chunks: [{p, docs:[], rets:[]}]
+    const index = new Map(), retIndex = new Map();
+    chunks.forEach(ch => {
+      (ch.docs || []).forEach(line => {
+        const [t, sr, n, rif, iva, f] = line.split('|');
+        const k = normKey(n);
+        (index.get(k) || index.set(k, []).get(k)).push({ t, s: sr, n, rif, iva: +iva, f, p: ch.p });
+      });
+      (ch.rets || []).forEach(line => { const [c, k] = line.split('|'); retIndex.set(c + '|' + k, ch.p); });
+    });
+    return { index, retIndex };
+  }
+
+  function docLabel(r) {
+    if (r.tipoDoc === 'RET') return 'Ret. s/ ' + r.afectada;
+    const t = r.factura ? 'Fact. ' : r.nd ? 'ND ' : r.nc ? 'NC ' : '';
+    return t + (r.num || '');
+  }
+  function fmtN(n) { return (n || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+  return { FIELDS, DEFAULT_MAP, TIPOS, DEFAULT_CFG, readRows, validate, detectPeriod, makePeriod, periodFromKey, expectedPrev, buildIndex, loadIndex, checkRif, fmtN, fmtD, parseDate, normKey };
+})();
+
+
+</script>
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fN = VLV.fmtN;
+const MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const colL = i => { let s=''; i++; while(i>0){const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26);} return s; };
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,3200); }
+
+/* ================= ALMACÉN (db compartido o navegador) ================= */
+const LKEY='vlv:v1';
+const Local = {
+  read(){ try{ return JSON.parse(localStorage.getItem(LKEY)) || {empresas:{},periodos:{},indices:{}}; }catch(e){ return {empresas:{},periodos:{},indices:{}}; } },
+  write(d){ try{ localStorage.setItem(LKEY, JSON.stringify(d)); return true; }catch(e){ return false; } }
+};
+const Store = {
+  mode:'pending', db:null,
+  async init(){
+    let db=null;
+    try{ db = window.claude && window.claude.use ? await window.claude.use('db') : null; }catch(e){ db=null; }
+    if(db){ this.db=db; this.mode='db'; } else this.mode='local';
+  },
+  withTimeout(p){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout',message:'El histórico no respondió a tiempo.'}),10000))]); },
+  async listEmpresas(){
+    if(this.mode==='db'){ const q=await this.withTimeout(this.db.collection('empresas').get()); return q.docs.map(d=>({id:d.id,...d.data()})); }
+    const d=Local.read(); return Object.entries(d.empresas).map(([id,v])=>({id,...v}));
+  },
+  async saveEmpresa(e){
+    const {id,...body}=e;
+    if(this.mode==='db'){ await this.db.collection('empresas').doc(id).set(body); return; }
+    const d=Local.read(); d.empresas[id]=body; if(!Local.write(d)) throw {message:'El navegador no permitió guardar.'};
+  },
+  async listPeriodos(empId){
+    if(this.mode==='db'){ const q=await this.withTimeout(this.db.collection('periodos').where('empId','==',empId).get()); return q.docs.map(d=>({id:d.id,...d.data()})); }
+    const d=Local.read(); return Object.entries(d.periodos).filter(([,v])=>v.empId===empId).map(([id,v])=>({id,...v}));
+  },
+  async getChunks(per){
+    const out=[];
+    for(let i=0;i<(per.chunks||0);i++){
+      const id=per.id+'__'+i;
+      if(this.mode==='db'){ const s=await this.withTimeout(this.db.collection('indices').doc(id).get()); if(s.exists) out.push({p:per.periodKey,...s.data()}); }
+      else { const d=Local.read(); if(d.indices[id]) out.push({p:per.periodKey,...d.indices[id]}); }
+    }
+    return out;
+  },
+  async savePeriodo(per, chunks){
+    const {id,...body}=per;
+    if(this.mode==='db'){
+      for(let i=0;i<chunks.length;i++) await this.db.collection('indices').doc(id+'__'+i).set(chunks[i]);
+      await this.db.collection('periodos').doc(id).set(body); return;
+    }
+    const d=Local.read(); d.periodos[id]=body; chunks.forEach((c,i)=>d.indices[id+'__'+i]=c);
+    if(!Local.write(d)) throw {message:'El navegador no tiene espacio para guardar el histórico.'};
+  },
+  async deletePeriodo(per){
+    if(this.mode==='db'){ await this.db.collection('periodos').doc(per.id).delete(); for(let i=0;i<(per.chunks||0);i++) await this.db.collection('indices').doc(per.id+'__'+i).delete(); return; }
+    const d=Local.read(); delete d.periodos[per.id]; for(let i=0;i<(per.chunks||0);i++) delete d.indices[per.id+'__'+i]; Local.write(d);
+  }
+};
+
+/* ================= ESTADO ================= */
+const S = {
+  empresas:[], empId:'', periodos:[], file:null, rawRows:null, parsed:null, res:null, isExample:false,
+  period:null, periodManual:false, mapping:null, mapSource:'', cfg:{...VLV.DEFAULT_CFG},
+  sev:{error:true,warn:true,info:false}, cat:'', q:'', shown:200, downloads:null
+};
+const emp = () => S.empresas.find(e=>e.id===S.empId) || null;
+
+/* ================= INTERFAZ: empresa, tipo, período ================= */
+function fillTipos(sel, withAuto){
+  sel.innerHTML = Object.entries(VLV.TIPOS).filter(([k])=>withAuto||k!=='AUTO').map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
+}
+fillTipos($('tipoSel'), true); fillTipos($('neTipo'), false);
+$('perMes').innerHTML = MES.map((m,i)=>`<option value="${i+1}">${m}</option>`).join('');
+
+function renderEmpresas(){
+  const sel=$('empSel');
+  const opts = S.empresas.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(e=>`<option value="${esc(e.id)}">${esc(e.nombre)}${e.rif?' · '+esc(e.rif):''}</option>`);
+  sel.innerHTML = `<option value="">Sin empresa (no guarda histórico)</option>` + opts.join('');
+  sel.value = S.empId;
+}
+$('empSel').addEventListener('change', async e=>{
+  S.empId=e.target.value; try{localStorage.setItem('vlv:emp',S.empId);}catch(_){}
+  const em=emp();
+  $('tipoSel').value = em ? em.tipo : 'AUTO';
+  S.mapping = null; S.mapSource='';
+  await loadPeriodos(); runValidation(); renderHist();
+});
+$('btnNewEmp').addEventListener('click',()=>{ $('newEmp').hidden=!$('newEmp').hidden; if(!$('newEmp').hidden) $('neNombre').focus(); });
+$('neCancel').addEventListener('click',()=>{ $('newEmp').hidden=true; });
+$('newEmp').addEventListener('submit', async ev=>{
+  ev.preventDefault();
+  const nombre=$('neNombre').value.trim(); const rif=$('neRif').value.trim().toUpperCase().replace(/[\s\-.]/g,'');
+  if(!nombre){ $('neMsg').textContent='Escriba la razón social.'; return; }
+  if(rif){ const c=VLV.checkRif(rif); if(!c.ok){ $('neMsg').textContent='RIF inválido: '+c.msg+'.'; return; } }
+  const id = (rif || nombre.toUpperCase().replace(/[^A-Z0-9]+/g,'-').slice(0,40)) + '';
+  if(S.empresas.some(e=>e.id===id)){ $('neMsg').textContent='Esa empresa ya existe en la lista.'; return; }
+  const e={id, nombre, rif, tipo:$('neTipo').value, creado:new Date().toISOString()};
+  try{ await Store.saveEmpresa(e); }catch(err){ $('neMsg').textContent='No se pudo guardar: '+(err.message||err.code||'error'); return; }
+  S.empresas.push(e); S.empId=id; renderEmpresas(); $('tipoSel').value=e.tipo; $('newEmp').hidden=true; $('neNombre').value=''; $('neRif').value=''; $('neMsg').textContent='';
+  try{localStorage.setItem('vlv:emp',S.empId);}catch(_){}
+  await loadPeriodos(); runValidation(); renderHist(); toast('Empresa creada');
+});
+$('tipoSel').addEventListener('change', async ()=>{
+  const em=emp(); const v=$('tipoSel').value;
+  if(em && v!=='AUTO' && em.tipo!==v){ em.tipo=v; try{ await Store.saveEmpresa(em); toast('Tipo de facturación guardado para '+em.nombre); }catch(e){} }
+  runValidation();
+});
+['perMes','perAnio','perTipo'].forEach(id=>$(id).addEventListener('change',()=>{ S.periodManual=true; S.period=VLV.makePeriod(+$('perAnio').value, +$('perMes').value, $('perTipo').value); runValidation(); }));
+function showPeriod(p){ if(!p) return; $('perMes').value=p.m; $('perAnio').value=p.y; $('perTipo').value=p.t; }
+
+/* ================= PARÁMETROS Y COLUMNAS ================= */
+function cfgToUI(){ $('cfgTol').value=S.cfg.tol; $('cfgGap').value=S.cfg.maxGap; $('cfgAlic').value=S.cfg.alicuotas.join(', '); $('cfgRet').value=S.cfg.retPct.join(', '); }
+function cfgFromUI(){
+  const list = t => t.split(/[;,\s]+/).map(Number).filter(n=>!isNaN(n));
+  S.cfg={ tol:Math.max(0,+$('cfgTol').value||0), maxGap:Math.max(1,+$('cfgGap').value||500), alicuotas:list($('cfgAlic').value), retPct:list($('cfgRet').value) };
+}
+['cfgTol','cfgGap','cfgAlic','cfgRet'].forEach(id=>$(id).addEventListener('change',()=>{ cfgFromUI(); runValidation(); }));
+cfgToUI();
+function renderMap(){
+  const map = S.parsed ? S.parsed.map : VLV.DEFAULT_MAP;
+  const ncol = Math.max(33, ...(S.rawRows||[]).slice(0,60).map(r=>r?r.length:0));
+  const opts = ['<option value="-1">—</option>'].concat(Array.from({length:ncol},(_,i)=>`<option value="${i}">${colL(i)}</option>`)).join('');
+  $('mapGrid').innerHTML = VLV.FIELDS.map(([k,l])=>`<label for="m_${k}">${l}</label><select id="m_${k}" data-f="${k}">${opts}</select>`).join('');
+  VLV.FIELDS.forEach(([k])=>{ const v=map[k]; $('m_'+k).value = (v===undefined||v===null)?-1:v; });
+  $('mapNote').textContent = S.mapSource;
+}
+function mapFromUI(){ const m={}; VLV.FIELDS.forEach(([k])=>{ const v=+$('m_'+k).value; if(v>=0) m[k]=v; }); return m; }
+$('mapApply').addEventListener('click',()=>{ S.mapping=mapFromUI(); S.mapSource='Columnas ajustadas manualmente.'; reparse(); });
+$('mapReset').addEventListener('click',()=>{ S.mapping={...VLV.DEFAULT_MAP}; S.mapSource='Formato estándar del sistema (33 columnas, sin encabezado).'; reparse(); });
+$('mapSave').addEventListener('click', async ()=>{
+  const em=emp(); if(!em){ toast('Seleccione una empresa para guardar su formato'); return; }
+  em.map=mapFromUI(); try{ await Store.saveEmpresa(em); S.mapping=em.map; S.mapSource='Formato guardado de '+em.nombre+'.'; renderMap(); toast('Formato guardado para '+em.nombre); }catch(e){ toast('No se pudo guardar el formato'); }
+});
+
+/* ================= CARGA DE ARCHIVO ================= */
+const drop=$('drop');
+drop.addEventListener('click',()=>$('fileIn').click());
+drop.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); $('fileIn').click(); }});
+drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{ e.preventDefault(); drop.classList.remove('over'); if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+$('fileIn').addEventListener('change',e=>{ if(e.target.files[0]) readFile(e.target.files[0]); e.target.value=''; });
+function readFile(f){
+  if(typeof XLSX==='undefined'){ toast('No se pudo cargar el lector de Excel. Recargue la página.'); return; }
+  const fr=new FileReader();
+  fr.onload=()=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(fr.result),{type:'array',cellDates:false,raw:false});
+      // la hoja con más filas con fecha
+      let best=null;
+      wb.SheetNames.forEach(n=>{ const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:false}); const score=rows.filter(r=>r&&r.some(c=>VLV.parseDate(c))).length; if(!best||score>best.score) best={rows,score,n}; });
+      S.rawRows=best.rows; S.file={name:f.name, sheet:best.n}; S.isExample=false; S.periodManual=false;
+      $('fileName').textContent=f.name; $('exBanner').hidden=true;
+      reparse();
+    }catch(err){ toast('No se pudo leer el archivo: '+(err.message||err)); }
+  };
+  fr.readAsArrayBuffer(f);
+}
+function reparse(){
+  const em=emp();
+  let mapping = S.mapping || (em && em.map) || null;
+  if(!S.mapping && em && em.map) S.mapSource='Formato guardado de '+em.nombre+'.';
+  S.parsed = VLV.readRows(S.rawRows||[], mapping);
+  if(!mapping) S.mapSource = S.parsed.header ? 'Columnas detectadas por el encabezado (fila '+S.parsed.header+').' : S.parsed.inferred ? 'Columnas detectadas por la estructura del archivo ('+S.parsed.inferred+' columnas, sin encabezado). Revise y guarde si algo no coincide.' : 'Formato estándar del sistema (33 columnas, sin encabezado).';
+  if(!S.periodManual){ S.period = VLV.detectPeriod(S.parsed.rows); showPeriod(S.period); }
+  renderMap(); runValidation();
+}
+
+/* ================= HISTÓRICO PARA LA VALIDACIÓN ================= */
+async function loadPeriodos(){
+  S.periodos=[];
+  if(!S.empId) return;
+  try{ S.periodos = await Store.listPeriodos(S.empId); }catch(e){ toast('No se pudo leer el histórico: '+(e.message||e.code)); }
+}
+async function buildHistory(period){
+  if(!S.empId || !period || S.isExample) return null;
+  const prevs = S.periodos.filter(p=>p.periodKey!==period.key && VLV.periodFromKey(p.periodKey).start < period.start)
+    .sort((a,b)=>VLV.periodFromKey(b.periodKey).start - VLV.periodFromKey(a.periodKey).start);
+  const h={loaded:false,prev:null,index:new Map(),retIndex:new Map(),prevNote:null};
+  if(!prevs.length){ h.prevNote={sev:'info',msg:'No hay períodos anteriores guardados para esta empresa; la continuidad con el período anterior no se evaluó. Guarde este período para validar el siguiente.'}; return h; }
+  const prev=prevs[0];
+  h.prev={key:prev.periodKey,state:prev.state||{fl:{},mf:{}}};
+  const pp=VLV.periodFromKey(prev.periodKey);
+  if(pp.end >= period.start) h.prevNote={sev:'warn',msg:'El período guardado '+pp.label+' se superpone con '+period.label+'. Revise si mezcló libros mensuales y quincenales.'};
+  else if(!VLV.expectedPrev(period).includes(prev.periodKey)) h.prevNote={sev:'warn',msg:'El último período guardado es '+pp.label+'; falta el período inmediato anterior en el histórico. La continuidad se comparó contra '+pp.label+'.'};
+  try{
+    const chunks=[]; for(const p of prevs.slice(0,12)) chunks.push(...await Store.getChunks(p));
+    const ix=VLV.loadIndex(chunks); h.index=ix.index; h.retIndex=ix.retIndex; h.loaded=true;
+  }catch(e){ h.prevNote={sev:'warn',msg:'No se pudo leer el índice del histórico ('+(e.message||e.code)+'); retenciones y duplicados entre períodos no se verificaron.'}; }
+  return h;
+}
+
+/* ================= VALIDACIÓN ================= */
+let runId=0;
+async function runValidation(){
+  if(!S.parsed) return;
+  const my=++runId;
+  const period=S.period || VLV.detectPeriod(S.parsed.rows);
+  const hist=await buildHistory(period);
+  if(my!==runId) return;
+  const em=emp();
+  const tipo=$('tipoSel').value;
+  S.res=VLV.validate(S.parsed,{tipo, period, cfg:S.cfg, history:hist});
+  S.res.hist=hist;
+  if(tipo==='AUTO') $('tipoNote').textContent='Detectado en este libro: '+VLV.TIPOS[S.res.detected]+'.';
+  else $('tipoNote').textContent = (em? 'Configurado para '+em.nombre+'. ':'') + 'Contenido del libro: '+VLV.TIPOS[S.res.detected].toLowerCase()+'.';
+  $('perNote').textContent = S.periodManual ? 'Período fijado manualmente.' : 'Detectado por las fechas: '+(period?period.label:'—')+'.';
+  S.shown=200; $('saveBox').innerHTML='';
+  renderResults();
+}
+
+function renderResults(){
+  const r=S.res; if(!r) return;
+  const F=r.findings, c={error:0,warn:0,info:0}; F.forEach(f=>c[f.sev]++);
+  const v=$('verdict'); v.className='panel verdict'+(c.error?' has-err':c.warn?' has-warn':'');
+  const title = c.error ? c.error+' error'+(c.error>1?'es':'')+' por corregir' : c.warn ? 'Sin errores · '+c.warn+' advertencia'+(c.warn>1?'s':'')+' por revisar' : 'Libro conforme';
+  const em=emp();
+  v.innerHTML=`<div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <span class="big">${title}</span>
+      <span class="muted">${esc(em?em.nombre:'Sin empresa seleccionada')} · ${esc(r.period?r.period.label:'período no detectado')} · ${esc(S.isExample?'ejemplo':S.file?S.file.name:'')}</span>
+    </div>
+    <div class="meta">
+      <span class="sev error">${c.error} errores</span><span class="sev warn">${c.warn} advertencias</span><span class="sev info">${c.info} observaciones</span>
+      <span class="pill">${r.rows.length} filas · ${esc(VLV.TIPOS[r.tipo])}</span>
+    </div>`;
+  const t=r.totals, sm=r.summary;
+  const ck=(a,b)=> b===null||b===undefined ? '' : Math.abs(a-b)<=Math.max(S.cfg.tol,0.01) ? '<span class="chk ok">✓ cuadra con el resumen</span>' : '<span class="chk bad">✗ no cuadra con el resumen ('+fN(b)+')</span>';
+  $('kpis').innerHTML=`
+    <div class="kpi"><h3>Documentos</h3><span class="v">${t.docs.toLocaleString('es-VE')}</span><span class="s">${t.fac} fact. · ${t.nd} ND · ${t.nc} NC · ${t.anuladas} anuladas${t.ret?' · '+t.ret+' ret. de períodos previos':''}</span></div>
+    <div class="kpi"><h3>Base imponible</h3><span class="v">${fN(t.base)}</span><span class="s">Contrib. ${fN(t.cBase)} · No contrib. ${fN(t.nBase)}</span>${sm&&sm.total?ck(t.base,sm.total[0]):''}</div>
+    <div class="kpi"><h3>Débito fiscal</h3><span class="v">${fN(t.iva)}</span><span class="s">Contrib. ${fN(t.cIva)} · No contrib. ${fN(t.nIva)}</span>${sm&&sm.total?ck(t.iva,sm.total[1]):''}</div>
+    <div class="kpi"><h3>IVA retenido</h3><span class="v">${fN(t.retenido)}</span><span class="s">${t.iva?((t.retenido/t.iva*100).toFixed(2).replace('.',',')+' % del débito'):'—'}</span>${sm?ck(t.retenido,sm.retenido):''}</div>`;
+  // correlativos
+  const contTxt = s => {
+    if(!s.cont) return '<span class="cont none">'+(S.empId&&!S.isExample?'Sin período anterior':'Sin histórico')+'</span>';
+    if(s.cont.ok) return '<span class="cont ok">✓ sigue a '+esc(String(s.cont.prev))+'</span>';
+    if(s.cont.none) return '<span class="cont none">Sin antecedente</span>';
+    return '<span class="cont bad">✗ '+(s.cont.overlap?'repite':'salto desde')+' '+esc(String(s.cont.prev))+'</span>';
+  };
+  $('contNote').textContent = r.hist && r.hist.prev ? 'Continuidad contra '+VLV.periodFromKey(r.hist.prev.key).label : (S.empId && !S.isExample ? 'Sin período anterior guardado' : 'Seleccione una empresa para usar el histórico');
+  $('seriesTbl').innerHTML = r.series.length ? `<thead><tr><th>Serie</th><th class="num">Desde</th><th class="num">Hasta</th><th class="num">Cant.</th><th class="num">Faltan</th><th class="num">Repet.</th><th>Continuidad</th></tr></thead><tbody>`+
+    r.series.map(s=>`<tr><td>${esc(s.label)}</td><td class="num">${esc(s.from)}</td><td class="num">${esc(s.to)}</td><td class="num">${s.count.toLocaleString('es-VE')}</td><td class="num">${s.missing?'<span class="sev error">'+s.missing+'</span>':'<span class="muted">0</span>'}</td><td class="num">${s.dups?'<span class="sev error">'+s.dups+'</span>':'<span class="muted">0</span>'}</td><td>${contTxt(s)}</td></tr>`).join('')+'</tbody>'
+    : '<tbody><tr><td class="empty">No hay documentos con número para evaluar.</td></tr></tbody>';
+  // filtros
+  $('cErr').textContent=c.error; $('cWarn').textContent=c.warn; $('cInfo').textContent=c.info;
+  const cats=[...new Set(F.map(f=>f.cat))].sort();
+  if(S.cat && !cats.includes(S.cat)) S.cat='';
+  $('catSel').innerHTML='<option value="">Todas las categorías</option>'+cats.map(k=>`<option ${k===S.cat?'selected':''}>${esc(k)}</option>`).join('');
+  $('btnSave').disabled = S.isExample || !S.empId;
+  $('btnSave').title = S.isExample ? 'Cargue su libro para guardarlo' : !S.empId ? 'Seleccione o cree una empresa' : '';
+  renderFindings();
+}
+function filtered(){
+  const q=S.q.trim().toLowerCase();
+  return S.res.findings.filter(f=>S.sev[f.sev] && (!S.cat||f.cat===S.cat) && (!q || (f.msg+' '+f.doc+' '+f.cat+' '+(f.row||'')).toLowerCase().includes(q)));
+}
+function renderFindings(){
+  const list=filtered();
+  const lbl={error:'Error',warn:'Advertencia',info:'Observación'};
+  $('findTbl').innerHTML = list.length ? `<thead><tr><th>Nivel</th><th class="num">Fila</th><th>Fecha</th><th>Documento</th><th>Categoría</th><th>Detalle</th></tr></thead><tbody>`+
+    list.slice(0,S.shown).map(f=>`<tr><td><span class="sev ${f.sev}">${lbl[f.sev]}</span></td><td class="num">${f.row||'—'}</td><td class="mono" style="white-space:nowrap">${esc(f.fecha)}</td><td class="mono" style="white-space:nowrap">${esc(f.doc)}</td><td style="white-space:nowrap">${esc(f.cat)}</td><td style="min-width:280px">${esc(f.msg)}</td></tr>`).join('')+'</tbody>'
+    : `<tbody><tr><td class="empty">${S.res.findings.length?'Ningún hallazgo con estos filtros.':'Sin hallazgos: el libro cumple todas las validaciones.'}</td></tr></tbody>`;
+  $('findCount').textContent = list.length ? 'Mostrando '+Math.min(S.shown,list.length)+' de '+list.length : '';
+  $('btnMore').hidden = list.length<=S.shown;
+}
+document.querySelectorAll('.chip[data-sev]').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.sev; S.sev[k]=!S.sev[k]; b.setAttribute('aria-pressed',S.sev[k]); S.shown=200; renderFindings(); }));
+$('catSel').addEventListener('change',e=>{ S.cat=e.target.value; S.shown=200; renderFindings(); });
+let qT; $('q').addEventListener('input',e=>{ clearTimeout(qT); qT=setTimeout(()=>{ S.q=e.target.value; S.shown=200; renderFindings(); },180); });
+$('btnMore').addEventListener('click',()=>{ S.shown+=300; renderFindings(); });
+
+/* ================= COPIAR / EXPORTAR ================= */
+const LBL={error:'Error',warn:'Advertencia',info:'Observación'};
+$('btnCopy').addEventListener('click',()=>{
+  const list=filtered();
+  const tsv=['Nivel\tFila\tFecha\tDocumento\tCategoría\tDetalle'].concat(list.map(f=>[LBL[f.sev],f.row||'',f.fecha,f.doc,f.cat,f.msg].join('\t'))).join('\n');
+  const done=()=>toast(list.length+' hallazgos copiados; péguelos en Excel');
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done).catch(()=>fallbackCopy(tsv,done)); else fallbackCopy(tsv,done);
+});
+function fallbackCopy(t,done){ const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast('No se pudo copiar'); } ta.remove(); }
+$('btnExport').addEventListener('click', async ()=>{
+  if(!S.res||!S.downloads) return;
+  const r=S.res, em=emp();
+  const wb=XLSX.utils.book_new();
+  const head=[['Validación de libro de ventas'],['Empresa',em?em.nombre:''],['RIF',em?em.rif:''],['Período',r.period?r.period.label:''],['Archivo',S.file?S.file.name:''],['Tipo de facturación',VLV.TIPOS[r.tipo]],['Validado',new Date().toLocaleString('es-VE')],[],
+    ['Documentos',r.totals.docs],['Base imponible',+r.totals.base.toFixed(2)],['Débito fiscal',+r.totals.iva.toFixed(2)],['IVA retenido',+r.totals.retenido.toFixed(2)],[],
+    ['Errores',r.findings.filter(f=>f.sev==='error').length],['Advertencias',r.findings.filter(f=>f.sev==='warn').length],['Observaciones',r.findings.filter(f=>f.sev==='info').length]];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(head), 'Resumen');
+  const fs=XLSX.utils.aoa_to_sheet([['Nivel','Fila','Fecha','Documento','Categoría','Detalle']].concat(r.findings.map(f=>[LBL[f.sev],f.row||'',f.fecha,f.doc,f.cat,f.msg])));
+  fs['!cols']=[{wch:12},{wch:6},{wch:11},{wch:18},{wch:18},{wch:110}];
+  XLSX.utils.book_append_sheet(wb, fs, 'Hallazgos');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Serie','Desde','Hasta','Cantidad','Faltantes','Repetidos','Continuidad']].concat(r.series.map(s=>[s.label,s.from,s.to,s.count,s.missing,s.dups,!s.cont?'Sin histórico':s.cont.ok?'Sigue a '+s.cont.prev:s.cont.none?'Sin antecedente':(s.cont.overlap?'Repite ':'Salto desde ')+s.cont.prev]))), 'Correlativos');
+  const data=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  const name=('Validacion_LV_'+(em?em.nombre:'libro')+'_'+(r.period?r.period.key:'')).replace(/[^\wÁÉÍÓÚÑáéíóúñ\-]+/g,'_')+'.xlsx';
+  try{ await S.downloads.save({filename:name, data:new Uint8Array(data)}); }catch(e){ if(e&&e.code!=='declined') toast('No se pudo exportar ('+(e.code||'error')+')'); }
+});
+
+/* ================= GUARDAR PERÍODO ================= */
+$('btnSave').addEventListener('click',()=>{
+  const r=S.res; if(!r||!S.empId||S.isExample) return;
+  if(!r.period){ toast('Indique el período del libro'); return; }
+  const exists=S.periodos.find(p=>p.periodKey===r.period.key);
+  const nErr=r.findings.filter(f=>f.sev==='error').length;
+  const later=S.periodos.filter(p=>VLV.periodFromKey(p.periodKey).start>r.period.start);
+  const lines=[];
+  if(exists) lines.push('Ya existe '+r.period.label+' en el histórico (cargado el '+new Date(exists.cargado).toLocaleDateString('es-VE')+'). Se reemplazará.');
+  if(nErr) lines.push('El libro tiene '+nErr+' error'+(nErr>1?'es':'')+'. Los últimos números se guardarán tal como están en el archivo.');
+  if(later.length) lines.push('Hay '+later.length+' período(s) posteriores guardados; revalídelos después si cambia este.');
+  if(!lines.length) return doSave();
+  $('saveBox').innerHTML=`<div class="confirm" role="alert"><div>${lines.map(esc).join('<br>')}</div><div class="row"><button class="btn primary small" id="cfYes" type="button">Guardar de todos modos</button><button class="btn small" id="cfNo" type="button">Cancelar</button></div></div>`;
+  $('cfYes').onclick=()=>{ $('saveBox').innerHTML=''; doSave(); };
+  $('cfNo').onclick=()=>{ $('saveBox').innerHTML=''; };
+});
+async function doSave(){
+  const r=S.res, em=emp();
+  const ix=VLV.buildIndex(r.rows);
+  const chunks=[]; const N=2500;
+  for(let i=0;i<Math.max(ix.docs.length,ix.rets.length);i+=N) chunks.push({docs:ix.docs.slice(i,i+N),rets:ix.rets.slice(i,i+N)});
+  if(!chunks.length) chunks.push({docs:[],rets:[]});
+  const c={error:0,warn:0,info:0}; r.findings.forEach(f=>c[f.sev]++);
+  const old=S.periodos.find(p=>p.periodKey===r.period.key);
+  const per={ id:S.empId+'__'+r.period.key, empId:S.empId, periodKey:r.period.key, start:VLV.fmtD(r.period.start), end:VLV.fmtD(r.period.end),
+    archivo:S.file?S.file.name:'', cargado:new Date().toISOString(), tipo:r.tipo, chunks:chunks.length,
+    resumen:{filas:r.rows.length, docs:r.totals.docs, fac:r.totals.fac, nc:r.totals.nc, nd:r.totals.nd, anuladas:r.totals.anuladas, base:+r.totals.base.toFixed(2), iva:+r.totals.iva.toFixed(2), retenido:+r.totals.retenido.toFixed(2), errores:c.error, advertencias:c.warn},
+    series:r.series.map(s=>({label:s.label,from:s.from,to:s.to,count:s.count})), state:r.newState };
+  $('btnSave').disabled=true; $('btnSave').innerHTML='<span class="spin"></span> Guardando…';
+  try{
+    if(old && old.chunks>chunks.length) await Store.deletePeriodo({...old, chunks:old.chunks}).catch(()=>{});
+    await Store.savePeriodo(per, chunks);
+    await loadPeriodos(); toast(r.period.label+' guardado en el histórico de '+(em?em.nombre:'la empresa')); renderHist();
+  }catch(e){ toast('No se pudo guardar: '+(e.message||e.code||'error')); }
+  $('btnSave').disabled=false; $('btnSave').textContent='Guardar período en histórico';
+}
+
+/* ================= VISTA HISTÓRICO ================= */
+function setTab(h){ $('tabVal').setAttribute('aria-selected',!h); $('tabHist').setAttribute('aria-selected',h); $('viewVal').hidden=h; $('viewHist').hidden=!h; if(h) renderHist(); }
+$('tabVal').addEventListener('click',()=>setTab(false)); $('tabHist').addEventListener('click',()=>setTab(true));
+function renderHist(){
+  const em=emp();
+  $('histTitle').textContent = em ? 'Histórico · '+em.nombre : 'Histórico';
+  $('histNote').textContent = Store.mode==='db' ? 'El histórico se guarda en la base de datos de esta herramienta y lo ven todas las personas con acceso a ella.' : 'El histórico se guarda solo en este navegador. Exporte un respaldo para no perderlo o pasarlo a otro equipo.';
+  if(!em){ $('histBody').innerHTML='<div class="empty">Seleccione o cree una empresa en la pestaña Validar para ver sus períodos guardados.</div>'; return; }
+  const list=S.periodos.slice().sort((a,b)=>VLV.periodFromKey(b.periodKey).start-VLV.periodFromKey(a.periodKey).start);
+  if(!list.length){ $('histBody').innerHTML='<div class="empty">Todavía no hay períodos guardados para '+esc(em.nombre)+'. Valide un libro y pulse «Guardar período en histórico»; el siguiente libro continuará su correlativo.</div>'; return; }
+  $('histBody').innerHTML='<div class="tablewrap"><table><thead><tr><th>Período</th><th>Archivo</th><th>Guardado</th><th class="num">Docs.</th><th class="num">Base imponible</th><th class="num">Débito fiscal</th><th class="num">IVA retenido</th><th>Estado</th><th>Últimos números</th><th></th></tr></thead><tbody>'+
+    list.map(p=>{ const pp=VLV.periodFromKey(p.periodKey), R=p.resumen||{};
+      const last=(p.series||[]).map(s=>esc(s.label)+': <span class="mono">'+esc(s.to)+'</span>').join('<br>');
+      return `<tr><td style="white-space:nowrap"><b>${esc(pp.label)}</b></td><td class="mono">${esc(p.archivo)}</td><td style="white-space:nowrap">${new Date(p.cargado).toLocaleDateString('es-VE')}</td><td class="num">${(R.docs||0).toLocaleString('es-VE')}</td><td class="num">${fN(R.base)}</td><td class="num">${fN(R.iva)}</td><td class="num">${fN(R.retenido)}</td>
+      <td>${R.errores?'<span class="sev error">'+R.errores+' errores</span>':'<span class="sev ok">Sin errores</span>'}</td><td style="font-size:12px;min-width:240px">${last||'—'}</td>
+      <td><button class="btn small danger" data-del="${esc(p.id)}" type="button">Eliminar</button></td></tr>`; }).join('')+'</tbody></table></div><div id="delBox"></div>';
+  $('histBody').querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
+    const p=S.periodos.find(x=>x.id===b.dataset.del); if(!p) return;
+    $('delBox').innerHTML=`<div class="confirm" role="alert" style="margin-top:10px"><div>¿Eliminar ${esc(VLV.periodFromKey(p.periodKey).label)} del histórico? El período siguiente perderá su referencia de continuidad.</div><div class="row"><button class="btn primary small" id="dlYes" type="button">Eliminar</button><button class="btn small" id="dlNo" type="button">Cancelar</button></div></div>`;
+    $('dlNo').onclick=()=>$('delBox').innerHTML='';
+    $('dlYes').onclick=async()=>{ try{ await Store.deletePeriodo(p); await loadPeriodos(); renderHist(); runValidation(); toast('Período eliminado'); }catch(e){ toast('No se pudo eliminar'); } };
+  }));
+}
+$('btnBackup').addEventListener('click', async ()=>{
+  if(!S.downloads) return;
+  try{
+    const out={version:1, exportado:new Date().toISOString(), empresas:S.empresas, periodos:[], indices:{}};
+    for(const e of S.empresas){ const ps=await Store.listPeriodos(e.id); for(const p of ps){ out.periodos.push(p); const ch=await Store.getChunks(p); ch.forEach((c,i)=>{ const {p:_,...b}=c; out.indices[p.id+'__'+i]=b; }); } }
+    const data=new TextEncoder().encode(JSON.stringify(out));
+    await S.downloads.save({filename:'respaldo_libros_ventas_'+new Date().toISOString().slice(0,10)+'.json', data});
+  }catch(e){ if(e&&e.code!=='declined') toast('No se pudo exportar el respaldo'); }
+});
+$('btnRestore').addEventListener('click',()=>$('restoreIn').click());
+$('restoreIn').addEventListener('change',e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const fr=new FileReader();
+  fr.onload=async()=>{
+    try{
+      const d=JSON.parse(fr.result); if(!d||d.version!==1) throw {message:'No es un respaldo de esta herramienta.'};
+      for(const em of d.empresas||[]) await Store.saveEmpresa(em);
+      for(const p of d.periodos||[]){ const ch=[]; for(let i=0;i<(p.chunks||0);i++) ch.push(d.indices[p.id+'__'+i]||{docs:[],rets:[]}); await Store.savePeriodo(p, ch); }
+      S.empresas=await Store.listEmpresas(); renderEmpresas(); await loadPeriodos(); renderHist(); runValidation();
+      toast('Respaldo importado: '+(d.empresas||[]).length+' empresas, '+(d.periodos||[]).length+' períodos');
+    }catch(err){ toast('No se pudo importar: '+(err.message||'archivo inválido')); }
+  };
+  fr.readAsText(f);
+});
+
+/* ================= LIBRO DE EJEMPLO (datos ficticios) ================= */
+function rifDv(L,d8){ const w=[3,2,7,6,5,4,3,2], v={V:1,E:2,J:3,P:4,G:5}; let s=v[L]*4; for(let i=0;i<8;i++) s+=(+d8[i])*w[i]; let dv=11-(s%11); if(dv>=10) dv=0; return L+d8+dv; }
+function makeSample(){
+  const clientes=[['J','40011223','DISTRIBUIDORA EJEMPLO ARAGUA, C.A.'],['J','30155667','FARMACIA MODELO CENTRO, C.A.'],['J','50288990','COMERCIAL DEMOSTRACIÓN 2020, C.A.'],['G','20000111','ALCALDÍA FICTICIA DE PRUEBA'],['J','41234560','INVERSIONES MUESTRA DEL SUR, C.A.']];
+  const rows=[]; const blank=()=>Array(33).fill(0).map((_,i)=>[0,1,2,3,4,5,6,7,8,18,28,30,31].includes(i)?null:0);
+  const y=new Date().getFullYear(), m=new Date().getMonth()===0?12:new Date().getMonth(), yy=new Date().getMonth()===0?y-1:y;
+  const dd=d=>String(d).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+yy;
+  const pm=m===1?12:m-1, py=m===1?yy-1:yy;
+  // retención de un período anterior
+  let r=blank(); const c0=clientes[0]; r[0]='05/'+String(m).padStart(2,'0')+'/'+yy; r[1]='Unica'; r[2]=rifDv(c0[0],c0[1]); r[3]=c0[2]; r[8]='9480'; r[13]=16; r[30]=''+py+String(pm).padStart(2,'0')+'00000417'; r[31]='28/'+String(pm).padStart(2,'0')+'/'+py; r[32]=1240.5; rows.push(r);
+  let fac=9500, ctl=12500, day=1;
+  for(let i=0;i<26;i++){
+    if(i%3===0) day++;
+    const cl=clientes[i%clientes.length]; const base=Math.round((800+((i*7919)%9000))*100)/100; const iva=Math.round(base*16)/100;
+    r=blank(); r[0]=dd(Math.min(day,28)); r[1]='Unica'; r[2]=rifDv(cl[0],cl[1]); r[3]=cl[2]; r[4]=String(fac); r[7]='00-'+String(ctl).padStart(7,'0'); r[10]=Math.round((base+iva)*100)/100; r[12]=base; r[13]=16; r[14]=iva;
+    if(i===6){ r[14]=Math.round((iva+37.2)*100)/100; r[10]=Math.round((base+r[14])*100)/100; }      // IVA mal calculado
+    if(i===9){ fac++; ctl++; }                                                                       // salto de correlativo
+    if(i===14){ r[2]='J30155667'; }                                                                   // RIF con dígito errado
+    if(i===18){ r[30]=''+yy+String(m).padStart(2,'0')+'00000611'; r[31]=r[0]; r[32]=Math.round(iva*0.6*100)/100; } // retención 60%
+    if(i===20){ r[3]='ANULADA'; r[2]=null; r[10]=r[12]=r[14]=0; }
+    if(i===22){ ctl+=3; }                                                                            // control desfasado
+    rows.push(r); fac++; ctl++;
+  }
+  // nota de crédito sin factura afectada
+  r=blank(); const c2=clientes[2]; r[0]=dd(27); r[1]='Unica'; r[2]=rifDv(c2[0],c2[1]); r[3]=c2[2]; r[6]='NC0310'; r[7]='00-0090310'; r[10]=-580; r[12]=-500; r[13]=16; r[14]=-80; rows.push(r);
+  // venta a no contribuyente
+  r=blank(); r[0]=dd(28); r[1]='Unica'; r[2]='V12345678'; r[3]='CLIENTE DE CONTADO'; r[4]=String(fac); r[7]='00-'+String(ctl).padStart(7,'0'); r[20]=1160; r[22]=1000; r[23]=16; r[24]=160; rows.push(r);
+  return rows;
+}
+function loadExample(){
+  S.rawRows=makeSample(); S.file=null; S.isExample=true; S.periodManual=false; S.mapping=null;
+  $('exBanner').hidden=false; $('fileName').textContent='';
+  reparse();
+}
+
+/* ================= INICIO ================= */
+(async function init(){
+  loadExample();
+  await Store.init();
+  const pill=$('storePill');
+  if(Store.mode==='db'){ pill.className='pill ok'; $('storeTxt').textContent='Histórico compartido'; }
+  else { pill.className='pill warn'; $('storeTxt').textContent='Histórico en este navegador'; }
+  try{ S.empresas=await Store.listEmpresas(); }catch(e){ toast('No se pudo leer la lista de empresas: '+(e.message||e.code)); }
+  let last=''; try{ last=localStorage.getItem('vlv:emp')||''; }catch(_){}
+  if(S.empresas.some(e=>e.id===last)) S.empId=last;
+  renderEmpresas();
+  if(emp()) $('tipoSel').value=emp().tipo;
+  await loadPeriodos();
+  try{ S.downloads = window.claude && window.claude.use ? await window.claude.use('downloads') : null; }catch(e){ S.downloads=null; }
+  $('btnExport').hidden=!S.downloads; $('btnBackup').hidden=!S.downloads;
+  runValidation(); renderHist();
+})();
+})();
+</script>
+
+</body></html>

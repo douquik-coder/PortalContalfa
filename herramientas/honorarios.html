@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="/assets/bridge.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Honorarios (Vzla)</title>
+<style>
+    :root {
+        --primario: #0056b3;
+        --primario-claro: #007bff;
+        --verde: #28a745;
+        --rojo: #dc3545;
+        --fondo: #f4f4f4;
+        --borde: #ccc;
+        --texto: #333;
+        --caja: #d1ecf1;
+        --caja-borde: #bee5eb;
+        --caja-texto: #0c5460;
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 16px;
+        background: var(--fondo);
+        color: var(--texto);
+        display: flex;
+        justify-content: center;
+    }
+    .main-wrapper {
+        background: #fff;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.1);
+        max-width: 920px;
+        width: 100%;
+        display: grid;
+        grid-template-columns: 0.85fr 1.15fr;
+        gap: 18px;
+    }
+    header {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+    }
+    header img { max-width: 100px; height: auto; }
+    h1 { color: var(--primario); font-size: 1.5em; margin: 0; flex: 1; text-align: center; }
+
+    label { display: block; margin-bottom: 3px; font-weight: bold; font-size: .85em; }
+    input:not([type=radio]):not([type=checkbox]), select {
+        width: 100%;
+        padding: 6px;
+        margin-bottom: 8px;
+        border: 1px solid var(--borde);
+        border-radius: 4px;
+        font-size: .85em;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--primario-claro); box-shadow: 0 0 0 2px rgba(0,123,255,.2); }
+    input::placeholder { color: #aaa; }
+    input[readonly] { background: #e9ecef; cursor: default; }
+
+    .fila { display: flex; gap: 6px; }
+    .fila > * { flex: 1; }
+
+    fieldset { border: none; padding: 0; margin: 0 0 8px; font-size: .85em; }
+    legend { font-weight: bold; padding: 0; margin-bottom: 3px; }
+    .opciones { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+    .opciones label { display: inline-flex; align-items: center; gap: 4px; font-weight: normal; margin: 0; cursor: pointer; }
+
+    button {
+        background: var(--primario-claro);
+        color: #fff;
+        padding: 7px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        width: 100%;
+        margin-bottom: 8px;
+    }
+    button:hover { filter: brightness(.9); }
+    button.verde { background: var(--verde); }
+    button.rojo { background: var(--rojo); }
+    button.gris { background: #6c757d; }
+
+    details { font-size: .85em; margin-bottom: 8px; border: 1px solid #eee; border-radius: 4px; padding: 6px 8px; }
+    details summary { cursor: pointer; font-weight: bold; color: var(--primario); }
+    details[open] summary { margin-bottom: 6px; }
+
+    .result-box {
+        background: var(--caja);
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid var(--caja-borde);
+        color: var(--caja-texto);
+    }
+    .result-title-input {
+        font-weight: bold;
+        text-align: center;
+        font-size: 1em !important;
+        background: #e0f7fa;
+        color: var(--caja-texto);
+    }
+    .cliente-resumen { text-align: center; font-size: .85em; margin: -2px 0 8px; min-height: 1em; }
+
+    table.resultados { width: 100%; border-collapse: collapse; font-size: .85em; }
+    table.resultados th, table.resultados td { padding: 4px 6px; }
+    table.resultados th { text-align: right; border-bottom: 1px solid var(--borde); }
+    table.resultados th:first-child, table.resultados td:first-child { text-align: left; }
+    table.resultados td { text-align: right; font-variant-numeric: tabular-nums; }
+    table.resultados td.num { background: #f8f8f8; border-radius: 3px; }
+    table.resultados tr.total td { font-size: 1.15em; font-weight: bold; border-top: 1px solid var(--borde); padding-top: 6px; }
+    table.resultados tr.cero td { opacity: .55; }
+    table.resultados tr.gran-total td { background: #bfe3ea; color: #062c33; }
+    .pago-divisas { border: 1px dashed var(--caja-borde); border-radius: 4px; padding: 6px 8px; margin-bottom: 8px; font-size: .85em; }
+    .pago-divisas label { font-size: 1em; }
+    .oculto { display: none !important; }
+
+    .acciones { display: flex; gap: 6px; margin-top: 10px; }
+    .acciones button { margin: 0; }
+
+    .msg { font-size: .8em; padding: 5px; border-radius: 3px; margin-bottom: 8px; display: none; }
+    .msg.error { display: block; color: #721c24; background: #f8d7da; border: 1px solid #f5c6cb; }
+    .msg.success { display: block; color: #155724; background: #d4edda; border: 1px solid #c3e6cb; }
+
+    .date-note { font-size: .72em; color: #666; text-align: center; margin: 8px 0 4px; }
+    .note { padding: 5px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 5px; color: #856404; font-size: .72em; margin: 4px 0 0; }
+    .ayuda { font-size: .72em; color: #666; margin: -5px 0 8px; }
+
+    @media (max-width: 768px) {
+        .main-wrapper { grid-template-columns: 1fr; padding: 12px; }
+        header { flex-direction: column; }
+    }
+    /* Formas de pago (solo impresión) */
+    .solo-print { display: none; }
+    .formas-pago { margin-top: 14px; font-size: .85em; line-height: 1.35; }
+    .formas-pago h2 { font-size: 1.15em; margin: 0; color: #222; }
+    .formas-pago .fp-empresa { margin: 0 0 6px; font-weight: bold; color: #1a9bb0; }
+    .formas-pago ul { list-style: none; padding: 0; margin: 0; }
+    .formas-pago li { position: relative; padding-left: 26px; margin-bottom: 6px; }
+    .formas-pago li::before {
+        content: "✔";
+        position: absolute; left: 0; top: -2px;
+        font-size: 1.3em; font-weight: bold; color: #1a6f8a;
+    }
+
+    @media print {
+        @page { margin: 12mm; }
+        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { background: #fff; padding: 0; }
+        .main-wrapper { box-shadow: none; grid-template-columns: 1fr; padding: 0; }
+        .input-section, .acciones, .no-print { display: none !important; }
+        .solo-print { display: block; }
+        .formas-pago { break-inside: avoid; border-top: 1px solid #ccc; padding-top: 10px; }
+    }
+</style>
+</head>
+<body>
+<div class="main-wrapper">
+    <header>
+        <img src="mi_logo.png" alt="Logo" onerror="this.style.display='none'">
+        <h1>Calculadora de Honorarios</h1>
+    </header>
+
+    <!-- ================= ENTRADAS ================= -->
+    <section class="input-section">
+        <div id="message" class="msg" role="status"></div>
+
+        <label for="clienteSelect">Seleccionar cliente:</label>
+        <select id="clienteSelect">
+            <option value="">-- Seleccione un cliente --</option>
+        </select>
+
+        <label for="clienteNombre">Nombre del cliente:</label>
+        <input type="text" id="clienteNombre" placeholder="Ej: Empresa XYZ, C.A.">
+
+        <label for="honorariosDolar">Base de honorarios ($):</label>
+        <input type="number" id="honorariosDolar" placeholder="Ej: 1000" step="0.01" min="0" inputmode="decimal">
+
+        <div class="fila">
+            <button id="btnGuardarCliente" class="verde" type="button">Guardar / Actualizar</button>
+            <button id="btnEliminarCliente" class="rojo" type="button">Eliminar</button>
+        </div>
+
+        <div class="fila">
+            <div>
+                <label for="fechaTasa">Fecha tasa BCV:</label>
+                <input type="date" id="fechaTasa">
+            </div>
+            <div>
+                <label for="tasaBCV">Tasa BCV (Bs./$):</label>
+                <input type="number" id="tasaBCV" placeholder="Ej: 40,58" step="0.0001" min="0" inputmode="decimal">
+            </div>
+        </div>
+        <p class="ayuda">La tasa que escriba se guarda automáticamente para esa fecha.</p>
+
+        <fieldset>
+            <legend>Tipo de contribuyente (cliente):</legend>
+            <div class="opciones">
+                <label><input type="radio" name="tipoContribuyente" value="ordinario" checked> Ordinario</label>
+                <label><input type="radio" name="tipoContribuyente" value="especial"> Especial</label>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Mostrar resultados en:</legend>
+            <div class="opciones">
+                <label><input type="radio" name="mostrarMoneda" value="ambas" checked> Ambas</label>
+                <label><input type="radio" name="mostrarMoneda" value="bolivares"> Bs.</label>
+                <label><input type="radio" name="mostrarMoneda" value="dolar"> $</label>
+            </div>
+        </fieldset>
+
+        <div class="pago-divisas">
+            <label class="opciones" style="font-weight:bold">
+                <input type="checkbox" id="pagoDivisas"> Pagó en divisas (aplica IGTF)
+            </label>
+            <div id="bloqueDivisas" class="oculto">
+                <label for="montoDivisas" style="margin-top:6px">Monto pagado en divisas ($):</label>
+                <input type="number" id="montoDivisas" step="0.01" min="0" inputmode="decimal" placeholder="Ej: 500" disabled>
+                <p class="ayuda" id="ayudaDivisas">Por defecto se toma el total neto en $. Puede cambiarlo si el pago fue parcial en divisas.</p>
+            </div>
+        </div>
+
+        <details>
+            <summary>Parámetros fiscales</summary>
+            <div class="fila">
+                <div>
+                    <label for="cfgUT">Unidad Tributaria (Bs.):</label>
+                    <input type="number" id="cfgUT" step="0.01" min="0">
+                </div>
+                <div>
+                    <label for="cfgIva">IVA (%):</label>
+                    <input type="number" id="cfgIva" step="0.01" min="0">
+                </div>
+            </div>
+            <div class="fila">
+                <div>
+                    <label for="cfgRetIva">Retención IVA (%):</label>
+                    <select id="cfgRetIva">
+                        <option value="75">75%</option>
+                        <option value="100">100%</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="cfgIslr">Retención ISLR (%):</label>
+                    <input type="number" id="cfgIslr" step="0.01" min="0">
+                </div>
+            </div>
+            <label for="cfgIgtf">IGTF (%):</label>
+            <input type="number" id="cfgIgtf" step="0.01" min="0">
+            <label class="opciones" style="font-weight:normal">
+                <input type="checkbox" id="cfgSustraendo"> Aplicar sustraendo ISLR (83,3333 × UT × % ISLR)
+            </label>
+            <p class="ayuda" id="sustraendoInfo" style="margin-top:4px"></p>
+            <button type="button" class="gris" id="btnRestablecer">Restablecer valores por defecto</button>
+        </details>
+    </section>
+
+    <!-- ================= RESULTADOS ================= -->
+    <section class="results-section">
+        <div class="result-box">
+            <input type="text" class="result-title-input" id="honorariosTitle" value="Honorarios Profesionales" aria-label="Título">
+            <p class="cliente-resumen" id="clienteResumen"></p>
+
+            <table class="resultados" id="tablaResultados">
+                <thead>
+                    <tr>
+                        <th>Concepto</th>
+                        <th class="col-bs">Bolívares (Bs.)</th>
+                        <th class="col-usd">Dólares ($)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Base imponible</td>
+                        <td class="num col-bs" id="baseBs">0,00</td>
+                        <td class="num col-usd" id="baseUsd">0,00</td>
+                    </tr>
+                    <tr>
+                        <td id="lblIva">IVA (16%)</td>
+                        <td class="num col-bs" id="ivaBs">0,00</td>
+                        <td class="num col-usd" id="ivaUsd">0,00</td>
+                    </tr>
+                    <tr id="filaRetIva">
+                        <td id="lblRetIva">Retención IVA (75%)</td>
+                        <td class="num col-bs" id="retIvaBs">0,00</td>
+                        <td class="num col-usd" id="retIvaUsd">0,00</td>
+                    </tr>
+                    <tr id="filaRetIslr">
+                        <td id="lblRetIslr">Retención ISLR (3%)</td>
+                        <td class="num col-bs" id="retIslrBs">0,00</td>
+                        <td class="num col-usd" id="retIslrUsd">0,00</td>
+                    </tr>
+                    <tr class="total">
+                        <td>Total neto a recibir</td>
+                        <td class="col-bs" id="totalBs">0,00</td>
+                        <td class="col-usd" id="totalUsd">0,00</td>
+                    </tr>
+                    <tr id="filaIgtf" class="oculto">
+                        <td id="lblIgtf">IGTF (3%)</td>
+                        <td class="num col-bs" id="igtfBs">0,00</td>
+                        <td class="num col-usd" id="igtfUsd">0,00</td>
+                    </tr>
+                    <tr id="filaGranTotal" class="total gran-total oculto">
+                        <td>Gran total (incluye IGTF)</td>
+                        <td class="col-bs" id="granTotalBs">0,00</td>
+                        <td class="col-usd" id="granTotalUsd">0,00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p class="date-note" id="notaTasa">
+                Este cálculo se muestra a la tasa BCV del día. En caso de pagar en fecha posterior, debe actualizar el monto.
+            </p>
+            <p class="note"><strong>Nota:</strong> En caso de pagar en efectivo en divisas, $ = €.</p>
+
+            <div class="acciones no-print">
+                <button type="button" id="btnCopiar">Copiar resumen</button>
+                <button type="button" class="gris" id="btnImprimir">Imprimir / PDF</button>
+            </div>
+        </div>
+
+        <!-- Solo visible al imprimir -->
+        <div class="formas-pago solo-print">
+            <h2>Formas de pago de nuestros servicios:</h2>
+            <p class="fp-empresa">Contalfa SC., R.I.F. J-31023511-2</p>
+            <ul>
+                <li>
+                    <strong>Banesco:</strong> Cuenta Corriente Nº 01340359763591014950<br>
+                    <strong>BNC:</strong> Cuenta Corriente Nº 01910001422101018236<br>
+                    <strong>Tasa (USD)</strong> BCV vigente al momento del pago.
+                </li>
+                <li><strong>Zelle:</strong> contalfafinanciero@contalfa.com</li>
+                <li><strong>Divisas en efectivo (US$=EUR)</strong></li>
+                <li><strong>Cuenta en Dólares efectivo BNC:</strong> 01910001412301019883</li>
+                <li>
+                    <strong>FaceBank International:</strong><br>
+                    ABA: 021502189<br>
+                    SWIFT: FILCPR22<br>
+                    Cuenta Nº 21630000193<br>
+                    Si el pago es inferior a 1.000 USD debe considerar la comisión bancaria por 40 USD.
+                </li>
+            </ul>
+        </div>
+    </section>
+</div>
+
+<script>
+(() => {
+    'use strict';
+
+    // ---------- Datos iniciales ----------
+    const CLIENTES_PREDEFINIDOS = [
+        { nombre: "CASA DE REPOSO CARELCO, C.A.", honorariosFijosDolar: 330.00 },
+        { nombre: "DATOS VENEZUELA, C.A.",        honorariosFijosDolar: 970.00 },
+        { nombre: "INVERSIONES OTHER LEVEL CA",   honorariosFijosDolar: 5060.00 }
+    ];
+    const TASAS_PREDEFINIDAS = { "2026-09-08": 40.58 };
+    const CONFIG_DEFECTO = { ut: 43, iva: 16, retIva: 75, islr: 3, igtf: 3, sustraendo: true };
+    const FACTOR_SUSTRAENDO = 83.3333;
+
+    const K = { clientes: 'clientesGuardados', tasas: 'tasasBCVGuardadas', config: 'configHonorarios' };
+
+    // ---------- Utilidades ----------
+    const $ = id => document.getElementById(id);
+
+    const storage = {
+        get(key, fallback) {
+            try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+            catch { return fallback; }
+        },
+        set(key, value) {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* sin almacenamiento */ }
+        }
+    };
+
+    const fmt = n => (Number.isFinite(n) ? n : 0)
+        .toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Acepta "40,58", "40.58" o "1.234,56"
+    const num = value => {
+        if (typeof value === 'number') return value;
+        let s = String(value || '').trim();
+        if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+        const n = parseFloat(s);
+        return Number.isFinite(n) ? n : NaN;
+    };
+
+    const redondear = n => Math.round((n + Number.EPSILON) * 100) / 100;
+
+    // Fecha local (toISOString usa UTC y después de las 8 p.m. en Vzla da el día siguiente)
+    const hoyLocal = () => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    const fechaLarga = iso => {
+        if (!iso) return '';
+        const [y, m, d] = iso.split('-').map(Number);
+        return new Date(y, m - 1, d).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    let timerMensaje;
+    function mostrarMensaje(texto, tipo = 'error') {
+        const div = $('message');
+        div.textContent = texto;
+        div.className = `msg ${tipo}`;
+        clearTimeout(timerMensaje);
+        timerMensaje = setTimeout(() => { div.className = 'msg'; }, 3500);
+    }
+
+    // ---------- Estado ----------
+    let clientes = [];
+    let tasas = {};
+    let config = {};
+    let ultimoCalculo = null;
+
+    // ---------- Clientes ----------
+    function cargarClientes() {
+        const guardados = storage.get(K.clientes, null);
+        const mapa = new Map();
+        CLIENTES_PREDEFINIDOS.forEach(c => mapa.set(c.nombre.toUpperCase(), { ...c }));
+        if (Array.isArray(guardados)) {
+            // Lo guardado tiene prioridad (permite actualizar honorarios de predefinidos)
+            guardados.forEach(c => {
+                if (c && c.nombre && Number.isFinite(+c.honorariosFijosDolar)) {
+                    mapa.set(c.nombre.toUpperCase(), { nombre: c.nombre, honorariosFijosDolar: +c.honorariosFijosDolar });
+                }
+            });
+        }
+        clientes = [...mapa.values()];
+        renderClientes();
+    }
+
+    function renderClientes(seleccionar = '') {
+        const sel = $('clienteSelect');
+        sel.length = 1;
+        clientes.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        clientes.forEach(c => {
+            const opt = new Option(c.nombre, c.nombre);
+            sel.add(opt);
+        });
+        sel.value = seleccionar;
+    }
+
+    const buscarCliente = nombre => clientes.find(c => c.nombre.toLowerCase() === nombre.trim().toLowerCase());
+
+    function guardarCliente() {
+        const nombre = $('clienteNombre').value.trim();
+        const honorarios = num($('honorariosDolar').value);
+
+        if (!nombre || !(honorarios > 0)) {
+            mostrarMensaje('Debe ingresar un nombre y honorarios válidos para guardar.');
+            return;
+        }
+
+        const existente = buscarCliente(nombre);
+        if (existente) {
+            if (existente.honorariosFijosDolar === honorarios) {
+                mostrarMensaje('El cliente ya existe con esos mismos honorarios.');
+                return;
+            }
+            if (!confirm(`¿Actualizar honorarios de "${existente.nombre}" de $${fmt(existente.honorariosFijosDolar)} a $${fmt(honorarios)}?`)) return;
+            existente.honorariosFijosDolar = honorarios;
+            mostrarMensaje('Honorarios actualizados.', 'success');
+        } else {
+            clientes.push({ nombre, honorariosFijosDolar: honorarios });
+            mostrarMensaje('Cliente guardado con éxito.', 'success');
+        }
+
+        storage.set(K.clientes, clientes);
+        renderClientes(existente ? existente.nombre : nombre);
+        calcularHonorarios();
+    }
+
+    function eliminarCliente() {
+        const nombre = $('clienteSelect').value;
+        if (!nombre) { mostrarMensaje('Seleccione un cliente de la lista para eliminarlo.'); return; }
+        if (!confirm(`¿Eliminar a "${nombre}" de la lista?`)) return;
+        clientes = clientes.filter(c => c.nombre !== nombre);
+        storage.set(K.clientes, clientes);
+        renderClientes();
+        $('clienteNombre').value = '';
+        $('honorariosDolar').value = '';
+        calcularHonorarios();
+        mostrarMensaje('Cliente eliminado.', 'success');
+    }
+
+    function alSeleccionarCliente() {
+        const c = clientes.find(x => x.nombre === $('clienteSelect').value);
+        $('clienteNombre').value = c ? c.nombre : '';
+        $('honorariosDolar').value = c ? c.honorariosFijosDolar : '';
+        calcularHonorarios();
+    }
+
+    // ---------- Tasas BCV ----------
+    function cargarTasas() {
+        tasas = { ...TASAS_PREDEFINIDAS, ...storage.get(K.tasas, {}) };
+    }
+
+    // Si no hay tasa exacta, usa la última fecha anterior disponible
+    function obtenerTasaPorFecha() {
+        const fecha = $('fechaTasa').value;
+        const input = $('tasaBCV');
+        if (!fecha) { input.value = ''; calcularHonorarios(); return; }
+
+        if (tasas[fecha]) {
+            input.value = tasas[fecha];
+        } else {
+            const anterior = Object.keys(tasas).filter(f => f < fecha).sort().pop();
+            if (anterior) {
+                input.value = tasas[anterior];
+                mostrarMensaje(`Sin tasa para ${fechaLarga(fecha)}. Se usó la del ${fechaLarga(anterior)}; actualícela si cambió.`);
+            } else {
+                input.value = '';
+                mostrarMensaje('No se encontró tasa para la fecha. Ingrésela manualmente.');
+            }
+        }
+        calcularHonorarios();
+    }
+
+    function guardarTasa() {
+        const fecha = $('fechaTasa').value;
+        const tasa = num($('tasaBCV').value);
+        if (!fecha || !(tasa > 0)) return;
+        tasas[fecha] = tasa;
+        const propias = storage.get(K.tasas, {});
+        propias[fecha] = tasa;
+        storage.set(K.tasas, propias);
+    }
+
+    // ---------- Configuración ----------
+    function cargarConfig() {
+        config = { ...CONFIG_DEFECTO, ...storage.get(K.config, {}) };
+        $('cfgUT').value = config.ut;
+        $('cfgIva').value = config.iva;
+        $('cfgRetIva').value = String(config.retIva);
+        $('cfgIslr').value = config.islr;
+        $('cfgIgtf').value = config.igtf;
+        $('cfgSustraendo').checked = config.sustraendo;
+    }
+
+    function leerConfig() {
+        config = {
+            ut: num($('cfgUT').value) || 0,
+            iva: num($('cfgIva').value) || 0,
+            retIva: num($('cfgRetIva').value) || 0,
+            islr: num($('cfgIslr').value) || 0,
+            igtf: num($('cfgIgtf').value) || 0,
+            sustraendo: $('cfgSustraendo').checked
+        };
+        storage.set(K.config, config);
+        calcularHonorarios();
+    }
+
+    function restablecerConfig() {
+        storage.set(K.config, CONFIG_DEFECTO);
+        cargarConfig();
+        calcularHonorarios();
+        mostrarMensaje('Parámetros restablecidos.', 'success');
+    }
+
+    // ---------- Cálculo ----------
+    const IDS_RESULTADO = ['baseBs','baseUsd','ivaBs','ivaUsd','retIvaBs','retIvaUsd','retIslrBs','retIslrUsd','totalBs','totalUsd',
+                           'igtfBs','igtfUsd','granTotalBs','granTotalUsd'];
+
+    // true cuando el usuario escribió el monto en divisas a mano; si no, se sincroniza con el total neto en $
+    let montoDivisasManual = false;
+
+    function alCambiarPagoDivisas() {
+        const activo = $('pagoDivisas').checked;
+        $('bloqueDivisas').classList.toggle('oculto', !activo);
+        $('montoDivisas').disabled = !activo;
+        if (activo) {
+            montoDivisasManual = false;
+            $('montoDivisas').focus();
+        } else {
+            $('montoDivisas').value = '';
+        }
+        calcularHonorarios();
+    }
+
+    function calcularHonorarios() {
+        const tasa = num($('tasaBCV').value);
+        const baseUsd = num($('honorariosDolar').value);
+        const especial = document.querySelector('input[name="tipoContribuyente"]:checked').value === 'especial';
+
+        const sustraendo = config.sustraendo ? FACTOR_SUSTRAENDO * config.ut * (config.islr / 100) : 0;
+        $('sustraendoInfo').textContent = config.sustraendo
+            ? `Sustraendo actual: Bs. ${fmt(sustraendo)} (aplica si el pago supera Bs. ${fmt(FACTOR_SUSTRAENDO * config.ut)})`
+            : 'Sin sustraendo: se retiene el % completo.';
+
+        $('lblIva').textContent = `IVA (${fmt(config.iva).replace(',00', '')}%)`;
+        $('lblRetIva').textContent = `Retención IVA (${config.retIva}%)`;
+        $('lblRetIslr').textContent = `Retención ISLR (${fmt(config.islr).replace(',00', '')}%)`;
+
+        const pagoDivisas = $('pagoDivisas').checked;
+        $('filaIgtf').classList.toggle('oculto', !pagoDivisas);
+        $('filaGranTotal').classList.toggle('oculto', !pagoDivisas);
+
+        aplicarVistaMoneda();
+
+        if (!(tasa > 0) || !(baseUsd > 0)) {
+            IDS_RESULTADO.forEach(id => $(id).textContent = '0,00');
+            $('lblIgtf').textContent = `IGTF (${fmt(config.igtf).replace(',00', '')}%)`;
+            ultimoCalculo = null;
+            actualizarResumen();
+            return;
+        }
+
+        const baseBs    = redondear(baseUsd * tasa);
+        const ivaBs     = redondear(baseBs * config.iva / 100);
+        const retIvaBs  = especial ? redondear(ivaBs * config.retIva / 100) : 0;
+        const retIslrBs = redondear(Math.max(0, baseBs * config.islr / 100 - sustraendo));
+        const totalBs   = redondear(baseBs + ivaBs - retIvaBs - retIslrBs);
+
+        const valores = { base: baseBs, iva: ivaBs, retIva: retIvaBs, retIslr: retIslrBs, total: totalBs };
+        for (const [k, bs] of Object.entries(valores)) {
+            $(`${k}Bs`).textContent = fmt(bs);
+            $(`${k}Usd`).textContent = fmt(bs / tasa);
+        }
+
+        $('filaRetIva').classList.toggle('cero', retIvaBs === 0);
+        $('filaRetIslr').classList.toggle('cero', retIslrBs === 0);
+
+        // ----- IGTF sobre el monto pagado en divisas -----
+        let igtfBs = 0, montoDivisas = 0;
+        if (pagoDivisas) {
+            const totalUsd = redondear(totalBs / tasa);
+            if (!montoDivisasManual) $('montoDivisas').value = totalUsd.toFixed(2);
+            montoDivisas = num($('montoDivisas').value);
+            if (!(montoDivisas > 0)) montoDivisas = 0;
+
+            const igtfUsd = redondear(montoDivisas * config.igtf / 100);
+            igtfBs = redondear(igtfUsd * tasa);
+            const granTotalBs = redondear(totalBs + igtfBs);
+
+            $('lblIgtf').textContent = `IGTF (${fmt(config.igtf).replace(',00', '')}% s/ $${fmt(montoDivisas)})`;
+            $('igtfBs').textContent = fmt(igtfBs);
+            $('igtfUsd').textContent = fmt(igtfUsd);
+            $('granTotalBs').textContent = fmt(granTotalBs);
+            $('granTotalUsd').textContent = fmt(granTotalBs / tasa);
+
+            $('ayudaDivisas').textContent = montoDivisas > totalUsd + 0.005
+                ? `Atención: el monto en divisas supera el total neto ($${fmt(totalUsd)}).`
+                : (montoDivisas < totalUsd - 0.005
+                    ? `Pago mixto: $${fmt(montoDivisas)} en divisas y Bs. ${fmt((totalUsd - montoDivisas) * tasa)} en bolívares.`
+                    : 'Por defecto se toma el total neto en $. Puede cambiarlo si el pago fue parcial en divisas.');
+        }
+
+        ultimoCalculo = { ...valores, tasa, especial, pagoDivisas, montoDivisas, igtf: igtfBs, granTotal: redondear(totalBs + igtfBs) };
+        actualizarResumen();
+    }
+
+    function aplicarVistaMoneda() {
+        const modo = document.querySelector('input[name="mostrarMoneda"]:checked').value;
+        document.querySelectorAll('.col-bs').forEach(el => el.classList.toggle('oculto', modo === 'dolar'));
+        document.querySelectorAll('.col-usd').forEach(el => el.classList.toggle('oculto', modo === 'bolivares'));
+    }
+
+    function actualizarResumen() {
+        const nombre = $('clienteNombre').value.trim();
+        const fecha = $('fechaTasa').value;
+        const tasa = num($('tasaBCV').value);
+        const partes = [];
+        if (nombre) partes.push(nombre);
+        if (tasa > 0) partes.push(`Tasa BCV ${fechaLarga(fecha)}: Bs. ${fmt(tasa)}`);
+        $('clienteResumen').textContent = partes.join(' · ');
+    }
+
+    // ---------- Copiar / imprimir ----------
+    async function copiarResumen() {
+        if (!ultimoCalculo) { mostrarMensaje('Primero complete honorarios y tasa.'); return; }
+        const c = ultimoCalculo, t = c.tasa;
+        const modo = document.querySelector('input[name="mostrarMoneda"]:checked').value;
+        const linea = (label, bs) => {
+            const p = [];
+            if (modo !== 'dolar') p.push(`Bs. ${fmt(bs)}`);
+            if (modo !== 'bolivares') p.push(`$ ${fmt(bs / t)}`);
+            return `${label}: ${p.join(' | ')}`;
+        };
+        const texto = [
+            $('honorariosTitle').value,
+            $('clienteNombre').value.trim() && `Cliente: ${$('clienteNombre').value.trim()}`,
+            `Tasa BCV (${fechaLarga($('fechaTasa').value)}): Bs. ${fmt(t)}`,
+            '',
+            linea('Base imponible', c.base),
+            linea($('lblIva').textContent, c.iva),
+            c.retIva ? linea($('lblRetIva').textContent, c.retIva) : null,
+            c.retIslr ? linea($('lblRetIslr').textContent, c.retIslr) : null,
+            linea('TOTAL NETO A RECIBIR', c.total),
+            c.pagoDivisas ? `Monto pagado en divisas: $ ${fmt(c.montoDivisas)}` : null,
+            c.pagoDivisas ? linea($('lblIgtf').textContent, c.igtf) : null,
+            c.pagoDivisas ? linea('GRAN TOTAL (incluye IGTF)', c.granTotal) : null,
+            '',
+            'Monto calculado a la tasa BCV indicada; si paga en fecha posterior debe actualizarse.'
+        ].filter(x => x !== null && x !== false).join('\n');
+
+        try {
+            await navigator.clipboard.writeText(texto);
+            mostrarMensaje('Resumen copiado. Puede pegarlo en WhatsApp o correo.', 'success');
+        } catch {
+            prompt('Copie el resumen:', texto);
+        }
+    }
+
+    // ---------- Inicio ----------
+    document.addEventListener('DOMContentLoaded', () => {
+        cargarConfig();
+        cargarClientes();
+        cargarTasas();
+
+        $('fechaTasa').value = hoyLocal();
+        obtenerTasaPorFecha();
+
+        $('clienteSelect').addEventListener('change', alSeleccionarCliente);
+        $('btnGuardarCliente').addEventListener('click', guardarCliente);
+        $('btnEliminarCliente').addEventListener('click', eliminarCliente);
+        $('fechaTasa').addEventListener('change', obtenerTasaPorFecha);
+        $('tasaBCV').addEventListener('input', calcularHonorarios);
+        $('tasaBCV').addEventListener('change', guardarTasa);
+        $('honorariosDolar').addEventListener('input', calcularHonorarios);
+        $('clienteNombre').addEventListener('input', actualizarResumen);
+        document.querySelectorAll('input[name="tipoContribuyente"], input[name="mostrarMoneda"]')
+            .forEach(r => r.addEventListener('change', calcularHonorarios));
+        $('pagoDivisas').addEventListener('change', alCambiarPagoDivisas);
+        $('montoDivisas').addEventListener('input', () => {
+            montoDivisasManual = $('montoDivisas').value.trim() !== '';
+            calcularHonorarios();
+        });
+        ['cfgUT', 'cfgIva', 'cfgRetIva', 'cfgIslr', 'cfgIgtf', 'cfgSustraendo']
+            .forEach(id => $(id).addEventListener('change', leerConfig));
+        $('btnRestablecer').addEventListener('click', restablecerConfig);
+        $('btnCopiar').addEventListener('click', copiarResumen);
+        $('btnImprimir').addEventListener('click', () => window.print());
+    });
+})();
+</script>
+</body>
+</html>

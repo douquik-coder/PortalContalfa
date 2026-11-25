@@ -1,0 +1,3 @@
+-- Aplicada en el proyecto Supabase "Portal Contalfa" (wcnqrtkobnkdkholnfeb) el 2026-11-25.
+-- Tablas: profiles, tools, tool_access, tool_docs (Validador), saved_work (Conciliador ATR), app_secrets.
+-- Ver el esquema vivo en Supabase; este archivo documenta la estructura y las reglas de acceso (RLS).
