@@ -6,21 +6,111 @@
   if (!P) return;
   var slug = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
 
-  // Almacenamiento del navegador separado por usuario, para que dos personas en el mismo equipo no se mezclen.
+  var C = P.cloud;
+
+  // Lo que la herramienta guarda "en el navegador" va a la nube del usuario (precargado por el portal antes de abrirla).
+  // Si la nube no estuviera disponible, se usa una copia separada por usuario en este equipo.
   try {
-    var real = window.localStorage;
-    var pre = 'pc:' + P.user.id + ':' + slug + ':';
-    var keys = function () { var a = []; for (var i = 0; i < real.length; i++) { var k = real.key(i); if (k && k.indexOf(pre) === 0) a.push(k.slice(pre.length)); } return a; };
-    var store = {
-      getItem: function (k) { return real.getItem(pre + k); },
-      setItem: function (k, v) { real.setItem(pre + k, String(v)); },
-      removeItem: function (k) { real.removeItem(pre + k); },
-      clear: function () { keys().forEach(function (k) { real.removeItem(pre + k); }); },
-      key: function (i) { return keys()[i] || null; },
-      get length() { return keys().length; }
-    };
-    Object.defineProperty(window, 'localStorage', { value: store, configurable: true });
+    var store;
+    if (C) {
+      store = {
+        getItem: function (k) { return C.lsGet(slug, String(k)); },
+        setItem: function (k, v) { C.lsSet(slug, String(k), v); },
+        removeItem: function (k) { C.lsRemove(slug, String(k)); },
+        clear: function () { C.lsKeys(slug).forEach(function (k) { C.lsRemove(slug, k); }); },
+        key: function (i) { return C.lsKeys(slug)[i] || null; },
+        get length() { return C.lsKeys(slug).length; }
+      };
+    } else {
+      var real = window.localStorage;
+      var pre = 'pc:' + P.user.id + ':' + slug + ':';
+      var keys = function () { var a = []; for (var i = 0; i < real.length; i++) { var k = real.key(i); if (k && k.indexOf(pre) === 0) a.push(k.slice(pre.length)); } return a; };
+      store = {
+        getItem: function (k) { return real.getItem(pre + k); },
+        setItem: function (k, v) { real.setItem(pre + k, String(v)); },
+        removeItem: function (k) { real.removeItem(pre + k); },
+        clear: function () { keys().forEach(function (k) { real.removeItem(pre + k); }); },
+        key: function (i) { return keys()[i] || null; },
+        get length() { return keys().length; }
+      };
+    }
+    var proxy = new Proxy(store, {
+      get: function (t, k) { if (k in t) return typeof t[k] === 'function' ? t[k].bind(t) : t[k]; return typeof k === 'string' ? t.getItem(k) : undefined; },
+      set: function (t, k, v) { t.setItem(k, v); return true; },
+      deleteProperty: function (t, k) { t.removeItem(k); return true; },
+      has: function (t, k) { return k in t || t.getItem(k) !== null; }
+    });
+    Object.defineProperty(window, 'localStorage', { value: proxy, configurable: true });
   } catch (e) { /* si el navegador no lo permite, la herramienta usa el almacenamiento normal */ }
+
+  if (C) {
+    // "Carpeta de datos": en el portal es la carpeta del usuario en la nube (sin diálogos de permisos).
+    var root = function () { return C.rootDir(slug, window); };
+    window.showDirectoryPicker = function () { return Promise.resolve(root()); };
+    // Las herramientas recuerdan la carpeta elegida en IndexedDB; ahí se guarda una marca y al leerla se entrega la carpeta de la nube.
+    // Si en este equipo nunca se eligió, se entrega igual, para que el trabajo aparezca solo en cualquier computador.
+    var FOLDER_DBS = { 'precierre-islr': 1, 'otherlevel_reporte': 1 };
+    try {
+      var OS = window.IDBObjectStore.prototype, RQ = window.IDBRequest.prototype;
+      var origPut = OS.put, origGet = OS.get;
+      OS.put = function (v, k) { if (v && v.__cloud) v = { __cloudDir: true }; return origPut.call(this, v, k); };
+      OS.get = function (k) { var r = origGet.call(this, k); try { r.__pcKey = k; r.__pcDb = this.transaction.db.name; } catch (e) {} return r; };
+      var desc = Object.getOwnPropertyDescriptor(RQ, 'result');
+      Object.defineProperty(RQ, 'result', {
+        configurable: true, enumerable: desc.enumerable,
+        get: function () {
+          var v = desc.get.call(this);
+          if (v && v.__cloudDir) return root();
+          if (v === undefined && this.__pcKey === 'dir' && FOLDER_DBS[this.__pcDb]) return root();
+          return v;
+        }
+      });
+    } catch (e) { console.warn('Portal: no se pudo conectar la carpeta en la nube', e); }
+
+    // Revisor de Mayor: su base de datos local se reemplaza por registros en la nube.
+    if (slug === 'mayor') {
+      var R = C.records(slug);
+      var b64 = function (u8) { var s = ''; for (var i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+      var unb64 = function (s) { var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+      var enc = function (obj) {
+        return JSON.stringify(obj, function (k, v) {
+          var o = this[k], t = Object.prototype.toString.call(o);
+          if (t === '[object Date]') return { __d: o.toISOString() };
+          if (ArrayBuffer.isView(o)) return { __u8: b64(new Uint8Array(o.buffer, o.byteOffset, o.byteLength)) };
+          if (t === '[object ArrayBuffer]') return { __ab: b64(new Uint8Array(o)) };
+          if (t === '[object Map]') return { __map: Array.from(o.entries()) };
+          return v;
+        });
+      };
+      var dec = function (txt) {
+        if (txt == null) return undefined;
+        return JSON.parse(txt, function (k, v) {
+          if (v && typeof v === 'object') {
+            if ('__u8' in v) return unb64(v.__u8);
+            if ('__ab' in v) return unb64(v.__ab).buffer;
+            if ('__d' in v) return new Date(v.__d);
+            if ('__map' in v) return new Map(v.__map);
+          }
+          return v;
+        });
+      };
+      var wrap = function (api) {
+        if (!api || api.__cloud) return api;
+        var w = Object.assign({}, api, {
+          __cloud: true,
+          open: function () { return Promise.resolve(true); },
+          isMemory: function () { return false; },
+          all: function (st) { return R.all(st).then(function (a) { return a.map(dec); }); },
+          get: function (st, id) { return R.get(st, id).then(dec); },
+          put: function (st, obj) { return R.put(st, obj.id, enc(obj)).then(function () { return obj.id; }); },
+          del: function (st, id) { return R.del(st, id); }
+        });
+        return w;
+      };
+      var cur = wrap(window.Store);
+      Object.defineProperty(window, 'Store', { configurable: true, get: function () { return cur; }, set: function (v) { cur = wrap(v); } });
+    }
+  }
 
   function download(filename, data) {
     var blob = data instanceof Blob ? data : new Blob([data]);

@@ -205,7 +205,7 @@
     const list = all.filter((t) => !EXEC.has(t.slug));
     $('#no-tools').classList.toggle('hide', list.length > 0 || exec.length > 0);
     $('#stat-tools').textContent = all.length;
-    $('#stat-cloud').textContent = all.filter((t) => t.cloud).length;
+    $('#stat-cloud').textContent = all.length;
     const now = new Date();
     $('#stat-date').textContent = now.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' }).replace('.', '');
     $('#stat-day').textContent = now.toLocaleDateString('es-VE', { weekday: 'long' });
@@ -213,7 +213,7 @@
     $('#tool-grid').innerHTML = list.map((t, i) => `<a class="tcard" href="#/h/${esc(t.slug)}" style="--i:${i}">
       <span class="tc-top"><span class="tc-ico">${ico(t)}</span><span class="cat">${esc(t.category)}</span></span>
       <b>${esc(t.name)}</b><p>${esc(t.description)}</p>
-      <span class="tc-foot"><span class="badge ${t.cloud ? 'cloud' : ''}">${t.cloud ? '☁ Guardado en la nube' : 'Guarda en este equipo'}</span><span class="tc-go" aria-hidden="true">→</span></span></a>`).join('');
+      <span class="tc-foot"><span class="badge cloud">☁ Guardado en la nube</span><span class="tc-go" aria-hidden="true">→</span></span></a>`).join('');
     $('#exec-zone').classList.toggle('hide', !exec.length);
     $('#home-body').classList.toggle('has-exec', exec.length > 0);
     $('#exec-tools').innerHTML = exec.map((t) => `<a class="xcard" href="#/h/${esc(t.slug)}">
@@ -232,16 +232,24 @@
     Object.assign(cur, { slug, snapshot: SNAPSHOT[slug] || null, workId: null, title: null, dirty: false, saving: null });
     $('#tool-name').textContent = t.name;
     const b = $('#tool-badge');
-    b.textContent = t.cloud ? '☁ Guardado en la nube' : 'Guarda en este equipo';
-    b.className = 'badge' + (t.cloud ? ' cloud' : '');
+    b.textContent = '☁ Cargando tu trabajo…';
+    b.className = 'badge cloud';
     $('#tool-actions').classList.toggle('hide', !cur.snapshot);
     setStatus('');
-    frame.src = '/herramientas/' + encodeURIComponent(slug) + '.html?v=' + encodeURIComponent(t.version || '1');
-    if (cur.snapshot) frame.addEventListener('load', offerResume, { once: true });
+    frame.src = 'about:blank';
+    const ready = Portal.cloud ? Portal.cloud.preload(slug).catch(() => null) : Promise.resolve();
+    ready.then(() => {
+      if (cur.slug !== slug) return;
+      if (b.textContent === '☁ Cargando tu trabajo…') b.textContent = '☁ Guardado en la nube';
+      frame.src = '/herramientas/' + encodeURIComponent(slug) + '.html?v=' + encodeURIComponent(t.version || '1');
+      if (cur.snapshot) frame.addEventListener('load', offerResume, { once: true });
+    });
   }
+  Portal.cloudStatus = ((txt, bad) => { const b = $('#tool-badge'); if (!b || !cur.slug) return; b.textContent = txt; b.className = 'badge' + (bad ? '' : ' cloud'); b.title = txt; });
 
   async function closeTool() {
     try { await flushSave(); } catch (e) { /* ya se avisó */ }
+    try { if (Portal.cloud) await Portal.cloud.flushAll(); } catch (e) { /* se reintenta al volver */ }
     frame.src = 'about:blank';
     cur.slug = null; cur.snapshot = null;
   }

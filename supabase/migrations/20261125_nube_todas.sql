@@ -1,0 +1,3 @@
+-- Guardado en la nube para todas las herramientas (aplicada en Supabase el 2026-11-25)
+-- Tabla public.tool_kv (user_id, tool_slug, key, value, updated_at) con RLS: cada usuario solo lo suyo y solo en herramientas habilitadas.
+-- Bucket privado "trabajo" (50 MB por archivo): rutas <usuario>/<herramienta>/..., mismas reglas.
