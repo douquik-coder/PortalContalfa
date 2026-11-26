@@ -1102,54 +1102,108 @@ function tabRes(C){
 }
 
 /* ---------- Excel ---------- */
+const XNF='#,##0.00;-#,##0.00',XPF='0.00%';
+const xc=(c,r)=>XLSX.utils.encode_cell({c,r}),xcol=c=>XLSX.utils.encode_col(c);
+const xPct=(v,base,f)=>base&&isFinite(v/base)?{t:'n',v:v/base,z:XPF,f}:'';
+function xFormato(ws){Object.keys(ws).forEach(k=>{if(k[0]==='!')return;const c=ws[k];if(c.t==='n'&&!c.z)c.z=XNF;});}
 function exportarExcel(){
   if(!window.XLSX){alert('No se pudo cargar la librería de Excel.');return;}
   const C=calc(),ej=E(),I=C.I,np=C.np,wb=XLSX.utils.book_new(),B=bcAjustado(C),P=C.PND,D=C.DED;
   const cols=Array.from({length:np},(_,k)=>mesLabel(ej.hasta+k)+' proy.');
   const head=t=>[[DB.empresa.nombre],['RIF '+DB.empresa.rif],[t],[periodoTxt()],[]];
-  const S=C.S,lin=(l,o,s=1)=>[l,s*o.ytd,...o.proj.map(v=>s*v),s*(o.ytd+sum(o.proj))];
+  const S=C.S,ING=S['Ingresos'],ingT=ING.ytd+sum(ING.proj);
+  const bases=[ING.ytd,...ING.proj,ingT]; // ingresos de cada período (base del análisis vertical)
   const cg={ytd:S['Costos'].ytd+S['Gastos'].ytd,proj:S['Costos'].proj.map((v,k)=>v+S['Gastos'].proj[k])};
-  const hdr=['Concepto','Real '+mesLabel(0)+' a '+mesLabel(ej.hasta-1),...cols,'Total ejercicio'];
+  const perHdr=['Real '+mesLabel(0)+' a '+mesLabel(ej.hasta-1),...cols,'Total ejercicio'];
+  const hdrER=pre=>[...pre,...perHdr.flatMap(h=>[h,'% s/ ingresos'])];
+  const add=(ws,sh)=>{xFormato(ws);XLSX.utils.book_append_sheet(wb,ws,sh);};
+  // Estados de resultados con análisis vertical: cada monto va seguido de su % sobre los ingresos del mismo período.
+  // El % es una fórmula de Excel contra la fila de ingresos, así se actualiza si el usuario ajusta un monto.
+  const erSheet=(titulo,pre,lineas,anchos)=>{
+    const aoa=[...head(titulo),hdrER(pre)],pend=[];let baseRow=-1;
+    lineas.forEach(L=>{
+      if(L.sec){aoa.push([...Array(pre.length-1).fill(''),L.sec]);return;}
+      const r=aoa.length,vals=[L.o.ytd,...L.o.proj,L.o.ytd+sum(L.o.proj)].map(v=>L.s*v);
+      if(L.base)baseRow=r;
+      aoa.push([...L.pre,...vals.flatMap(v=>[v,null])]);pend.push([r,vals]);
+    });
+    pend.forEach(([r,vals])=>vals.forEach((v,j)=>{const c=pre.length+2*j,ca=xcol(c);
+      aoa[r][c+1]=baseRow<0?'':xPct(v,bases[j],`IF(${ca}$${baseRow+1}=0,"",${ca}${r+1}/${ca}$${baseRow+1})`);}));
+    if(baseRow<0)aoa.push([],['No hay ingresos en el período: no se calcula el análisis vertical.']);
+    else aoa.push([],['Análisis vertical: cada partida como porcentaje de los ingresos (ventas netas) del mismo período.']);
+    const ws=XLSX.utils.aoa_to_sheet(aoa);ws['!cols']=[...anchos,...Array(np+2).fill(null).flatMap(()=>[{wch:18},{wch:11}])];
+    return {ws,baseRow};
+  };
   // ER general
-  const er=[...head('Estado de resultados proyectado'),hdr,lin('Ingresos',S['Ingresos']),lin('Costos',S['Costos'],-1),lin('Gastos',S['Gastos'],-1),lin('Total costos y gastos',cg,-1),lin('Otros ingresos',S['Otros ingresos']),lin('Otros egresos',S['Otros egresos'],-1),lin('Resultado antes de ISLR',C.R)];
-  const ws0=XLSX.utils.aoa_to_sheet(er);ws0['!cols']=[{wch:42},...Array(np+2).fill({wch:18})];XLSX.utils.book_append_sheet(wb,ws0,'ER general');
+  const g=(l,o,s=1,base=false)=>({pre:[l],o,s,base});
+  const ER0=erSheet('Estado de resultados proyectado',['Concepto'],[g('Ingresos',ING,1,true),g('Costos',S['Costos'],-1),g('Gastos',S['Gastos'],-1),g('Total costos y gastos',cg,-1),g('Otros ingresos',S['Otros ingresos']),g('Otros egresos',S['Otros egresos'],-1),g('Resultado antes de ISLR',C.R)],[{wch:42}]);
+  add(ER0.ws,'ER general');
   // ER detallado
-  const erd=[...head('Estado de resultados proyectado (detallado)'),['Cuenta',...hdr]];
+  const det=[];
   [['Ingresos',1],['Costos',-1],['Gastos',-1],['Otros ingresos',1],['Otros egresos',-1]].forEach(([cat,s])=>{
     const rs=C.rows.filter(r=>r.cat===cat&&(Math.abs(r.total)>0.005||Math.abs(r.ytd)>0.005)); if(!rs.length)return;
-    erd.push(['',cat.toUpperCase()]); rs.forEach(r=>erd.push([r.code,...lin(r.name,r,s)])); erd.push(['',...lin('Total '+cat.toLowerCase(),S[cat],s)]);});
-  erd.push(['',...lin('Resultado antes de ISLR',C.R)]);
-  const ws1=XLSX.utils.aoa_to_sheet(erd);ws1['!cols']=[{wch:16},{wch:50},...Array(np+2).fill({wch:18})];XLSX.utils.book_append_sheet(wb,ws1,'ER detallado');
-  // BC ajustado
+    det.push({sec:cat.toUpperCase()}); rs.forEach(r=>det.push({pre:[r.code,r.name],o:r,s}));
+    det.push({pre:['','Total '+cat.toLowerCase()],o:S[cat],s,base:cat==='Ingresos'});
+    if(cat==='Gastos')det.push({pre:['','Total costos y gastos'],o:cg,s:-1});});
+  det.push({pre:['','Resultado antes de ISLR'],o:C.R,s:1});
+  add(erSheet('Estado de resultados proyectado (detallado)',['Cuenta','Concepto'],det,[{wch:16},{wch:50}]).ws,'ER detallado');
+  // BC ajustado: % de cuentas de balance sobre el activo total; % de cuentas de resultado sobre los ingresos del ejercicio
   const lbl=mesLabel(0)+' a '+mesLabel(ej.hasta-1);
-  const bc=[...head('Balance de comprobación ajustado al cierre'),['Cuenta','Nombre','Saldo inicial','Debe','Haber','Saldo','Nota']];
-  B.rows.filter(r=>!ej.cfg.bcCero||Math.abs(r.si)+Math.abs(r.debe)+Math.abs(r.haber)+Math.abs(r.pd)+Math.abs(r.ph)>0.005).forEach(r=>bc.push([r.code,r.name,r.si,r.debe+r.pd,r.haber+r.ph,r.sf,r.nuevo?'Cuenta nueva':'']));
+  const catDe=new Map(C.rows.map(r=>[r.key,r.cat]));
+  const ingCell=`'ER general'!$${xcol(1+2*(np+1))}$${ER0.baseRow+1}`;
+  const bc=[...head('Balance de comprobación ajustado al cierre'),['Cuenta','Nombre','Saldo inicial','Debe','Haber','Saldo','% s/ activo total','% s/ ingresos','Nota']];
+  const filas=B.rows.filter(r=>!ej.cfg.bcCero||Math.abs(r.si)+Math.abs(r.debe)+Math.abs(r.haber)+Math.abs(r.pd)+Math.abs(r.ph)>0.005);
+  const actT=sum(B.rows.filter(r=>r.code[0]==='1').map(r=>r.sf));
+  const pendBC=[],totAct=[];let gr=null,acc=null;
+  const cierraG=()=>{if(!acc)return;const r=bc.length;bc.push(['','Total '+(GRUPOS[acc.g]||'otros').toLowerCase(),acc.si,acc.debe,acc.haber,acc.sf,'','','']);
+    if(acc.g==='1')totAct.push(r);pendBC.push({r,g:acc.g,sf:acc.sf,cat:null,tot:true});};
+  filas.forEach(x=>{const gg=x.code[0];if(gg!==gr){cierraG();gr=gg;acc={g:gg,si:0,debe:0,haber:0,sf:0};bc.push(['',GRUPOS[gg]||'OTROS']);}
+    acc.si+=x.si;acc.debe+=x.debe+x.pd;acc.haber+=x.haber+x.ph;acc.sf+=x.sf;
+    pendBC.push({r:bc.length,g:gg,sf:x.sf,cat:catDe.get(x.k)});bc.push([x.code,x.name,x.si,x.debe+x.pd,x.haber+x.ph,x.sf,'','',x.nuevo?'Cuenta nueva':'']);});
+  cierraG();
+  const aRow=totAct[0];
+  pendBC.forEach(o=>{const F=`F${o.r+1}`;
+    if('123'.includes(o.g)){const s=o.g==='1'?1:-1;if(aRow!=null)bc[o.r][6]=xPct(s*o.sf,actT,`IF($F$${aRow+1}=0,"",${s<0?'-':''}${F}/$F$${aRow+1})`);}
+    else{const cs=o.cat?CAT_SIGN[o.cat]:(o.g==='4'?-1:1);if(o.tot&&!'456'.includes(o.g))return;
+      if(ER0.baseRow>=0)bc[o.r][7]=xPct(cs*o.sf,ingT,`IF(${ingCell}=0,"",${cs<0?'-':''}${F}/${ingCell})`);}});
   bc.push(['','TOTALES',B.T.si,B.T.debe+B.T.pd,B.T.haber+B.T.ph,B.T.sf]);
-  const ws2=XLSX.utils.aoa_to_sheet(bc);ws2['!cols']=[{wch:18},{wch:70},...Array(4).fill({wch:20}),{wch:14}];XLSX.utils.book_append_sheet(wb,ws2,'BC ajustado');
+  bc.push([],['Análisis vertical: activo, pasivo y patrimonio como % del activo total al cierre; cuentas de ingresos, costos y gastos como % de los ingresos del ejercicio.']);
+  const ws2=XLSX.utils.aoa_to_sheet(bc);ws2['!cols']=[{wch:18},{wch:70},...Array(4).fill({wch:20}),{wch:12},{wch:12},{wch:14}];add(ws2,'BC ajustado');
   // Asientos
   const as=[...head('Asientos proyectados'),['Mes','Concepto','Cuenta débito','Nombre','Cuenta crédito','Nombre','Monto']];
   B.asi.forEach(a=>as.push([mesLabel(ej.hasta+a.k),a.concepto,a.deb.code,a.deb.name,a.cre.code,a.cre.name,a.m]));
-  const ws3=XLSX.utils.aoa_to_sheet(as);ws3['!cols']=[{wch:8},{wch:42},{wch:16},{wch:40},{wch:16},{wch:40},{wch:16}];XLSX.utils.book_append_sheet(wb,ws3,'Asientos proyectados');
+  const ws3=XLSX.utils.aoa_to_sheet(as);ws3['!cols']=[{wch:8},{wch:42},{wch:16},{wch:40},{wch:16},{wch:40},{wch:16}];add(ws3,'Asientos proyectados');
   // Pasivos fiscales
-  const PF=pasivosFiscales(C,B);const pf=[...head('Pasivos por impuestos y contribuciones al cierre'),['Cuenta','Nombre','Saldo al corte','Causado en la proyección','Saldo al cierre','Origen / tratamiento']];
-  PF.forEach(r=>pf.push([r.code,r.name,-r.sc,r.ph-r.pd,-r.sf,r.obs.join(' | ')]));
-  const ws4=XLSX.utils.aoa_to_sheet(pf);ws4['!cols']=[{wch:16},{wch:50},{wch:16},{wch:16},{wch:16},{wch:80}];XLSX.utils.book_append_sheet(wb,ws4,'Pasivos fiscales');
+  const PF=pasivosFiscales(C,B);const pf=[...head('Pasivos por impuestos y contribuciones al cierre'),['Cuenta','Nombre','Saldo al corte','Causado en la proyección','Saldo al cierre','% del total por pagar','Origen / tratamiento']];
+  const pfT=-sum(PF.map(r=>r.sf)),pf0=pf.length,pfTR=pf0+PF.length;
+  PF.forEach((r,i)=>pf.push([r.code,r.name,-r.sc,r.ph-r.pd,-r.sf,xPct(-r.sf,pfT,`IF($E$${pfTR+1}=0,"",E${pf0+i+1}/$E$${pfTR+1})`),r.obs.join(' | ')]));
+  pf.push(['','Total por pagar al cierre','','',pfT,xPct(pfT,pfT,`IF($E$${pfTR+1}=0,"",E${pfTR+1}/$E$${pfTR+1})`)]);
+  const ws4=XLSX.utils.aoa_to_sheet(pf);ws4['!cols']=[{wch:16},{wch:50},{wch:16},{wch:16},{wch:16},{wch:12},{wch:80}];add(ws4,'Pasivos fiscales');
   // Conciliación e ISLR
-  const r1=[...head('Conciliación fiscal y cálculo del ISLR'),['Resultado contable antes de ISLR',I.util],['(+) Partidas no deducibles',P.total]];
+  const r1=[...head('Conciliación fiscal y cálculo del ISLR'),['Concepto','Monto','% s/ resultado contable'],['Resultado contable antes de ISLR',I.util],['(+) Partidas no deducibles',P.total]];
   C.pndCtas.forEach(r=>r1.push(['    '+r.name,r.total]));if(P.noPago)r1.push(['    Tributos causados no pagados',P.noPago]);if(P.prov)r1.push(['    Provisiones no deducibles',P.prov]);if(P.lin)r1.push(['    Movimientos del mayor',P.lin]);ej.pndMan.forEach(m=>r1.push(['    '+m.desc,+m.monto]));
   r1.push(['(−) Deducibles causados en años anteriores',-D.total]);D.lista.filter(d=>d.on).forEach(d=>r1.push(['    '+d.c.name,-d.monto]));ej.dedMan.forEach(m=>r1.push(['    '+m.desc,-m.monto]));
   r1.push(['(−) Ingresos exentos / no gravables',-(+ej.islr.noGrav||0)],...ej.islr.ajustes.map(a=>['(±) '+a.desc,+a.monto]),
-    ['Enriquecimiento neto fiscal',I.enr],['(−) Pérdidas trasladables',-I.perd],['Enriquecimiento gravable',I.base],['Enriquecimiento en U.T.',I.bu],[I.desc],['Impuesto causado',I.imp],
-    ['(−) Retenciones ISLR',-I.ret.total],['(−) Anticipos ISLR',-I.ant.total],['(−) Excedentes años anteriores',-I.exc],['(−) Otras rebajas',-(+ej.islr.otrasReb||0)],[I.pagar>=0?'ISLR a pagar':'Excedente a favor',Math.abs(I.pagar)]);
-  const ws5=XLSX.utils.aoa_to_sheet(r1);ws5['!cols']=[{wch:60},{wch:18}];XLSX.utils.book_append_sheet(wb,ws5,'Conciliacion ISLR');
+    ['Enriquecimiento neto fiscal',I.enr],['(−) Pérdidas trasladables',-I.perd],['Enriquecimiento gravable',I.base]);
+  const utR=6,finConc=r1.length; // fila del resultado contable (base del %)
+  for(let i=utR;i<finConc;i++)r1[i][2]=xPct(r1[i][1],I.util,`IF($B$${utR+1}=0,"",B${i+1}/$B$${utR+1})`);
+  r1.push(['Enriquecimiento en U.T.',I.bu],[I.desc]);const impR=r1.length;
+  r1.push(['Impuesto causado',I.imp,xPct(I.imp,I.util,`IF($B$${utR+1}=0,"",B${impR+1}/$B$${utR+1})`)],
+    ['(−) Retenciones ISLR',-I.ret.total],['(−) Anticipos ISLR',-I.ant.total],['(−) Excedentes años anteriores',-I.exc],['(−) Otras rebajas',-(+ej.islr.otrasReb||0)],[I.pagar>=0?'ISLR a pagar':'Excedente a favor',Math.abs(I.pagar)],[],
+    ['Tasa efectiva: impuesto causado / resultado contable',xPct(I.imp,I.util,`IF($B$${utR+1}=0,"",B${impR+1}/$B$${utR+1})`)],
+    ['Tasa efectiva: impuesto causado / enriquecimiento gravable',I.base?{t:'n',v:I.imp/I.base,z:XPF}:'']);
+  const ws5=XLSX.utils.aoa_to_sheet(r1);ws5['!cols']=[{wch:60},{wch:18},{wch:14}];add(ws5,'Conciliacion ISLR');
   // Proyección por cuenta
-  const r2=[['Cuenta','Nombre','Categoría','No deducible','Pago',...Array.from({length:ej.hasta},(_,i)=>mesLabel(i)),'Acumulado real','Criterio',...cols,'Total año']];
-  C.rows.filter(r=>r.hasMov||sum(r.proj)).forEach(r=>r2.push([r.code,r.name,r.cat,r.nd?'Sí':'',{banco:'Banco',ult:'Últ. mes por pagar',todo:'Todo por pagar'}[r.pago]||'',...r.vals,r.ytd,r.nota,...r.proj,r.total]));
-  const ws6=XLSX.utils.aoa_to_sheet(r2);ws6['!cols']=[{wch:16},{wch:44},{wch:14},{wch:8},{wch:16}];XLSX.utils.book_append_sheet(wb,ws6,'Proyeccion por cuenta');
+  const r2=[['Cuenta','Nombre','Categoría','No deducible','Pago',...Array.from({length:ej.hasta},(_,i)=>mesLabel(i)),'Acumulado real','% s/ ingresos real','Criterio',...cols,'Total año','% s/ ingresos año']];
+  C.rows.filter(r=>r.hasMov||sum(r.proj)).forEach(r=>{r2.push([r.code,r.name,r.cat,r.nd?'Sí':'',{banco:'Banco',ult:'Últ. mes por pagar',todo:'Todo por pagar'}[r.pago]||'',...r.vals,r.ytd,ING.ytd?{t:'n',v:r.ytd/ING.ytd,z:XPF}:'',r.nota,...r.proj,r.total,ingT?{t:'n',v:r.total/ingT,z:XPF}:'']);});
+  r2.push([],['Los % se calculan sobre los ingresos del período: real '+fmt(ING.ytd)+' · año '+fmt(ingT)+'.']);
+  const ws6=XLSX.utils.aoa_to_sheet(r2);ws6['!cols']=[{wch:16},{wch:44},{wch:14},{wch:8},{wch:16}];add(ws6,'Proyeccion por cuenta');
   // Provisiones y anticipos
-  const r3=[['Provisión','Base','%','Monto','Cuenta gasto','Cuenta pasivo','No deducible']];C.provs.forEach(p=>r3.push([p.nombre,BASES[p.base],+p.p||0,p.monto,p.gAcct.code+' '+p.gAcct.name,p.pas.code+' '+p.pas.name,p.nd?'Sí':'']));
-  r3.push([],['Mes','Ingresos','Anticipo ISLR','Retenciones ISLR']);C.S['Ingresos'].meses.forEach((v,i)=>r3.push([mesLabel(i),v,I.ant.meses[i],I.ret.meses[i]]));C.S['Ingresos'].proj.forEach((v,k)=>r3.push([mesLabel(ej.hasta+k)+' proy.',v,I.ant.proj[k],I.ret.proj[k]]));r3.push(['Total',C.S['Ingresos'].ytd+sum(C.S['Ingresos'].proj),I.ant.total,I.ret.total]);
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(r3),'Provisiones y anticipos');
+  const r3=[['Provisión','Base','%','Monto','Cuenta gasto','Cuenta pasivo','No deducible']];C.provs.forEach(p=>r3.push([p.nombre,BASES[p.base],{t:'n',v:(+p.p||0)/100,z:XPF},p.monto,p.gAcct.code+' '+p.gAcct.name,p.pas.code+' '+p.pas.name,p.nd?'Sí':'']));
+  r3.push([],['Mes','Ingresos','Anticipo ISLR','% anticipo s/ ingresos','Retenciones ISLR','% retenciones s/ ingresos']);
+  const fm=(i,v,a,rt)=>{const r=r3.length+1;return [i,v,a,xPct(a,v,`IF(B${r}=0,"",C${r}/B${r})`),rt,xPct(rt,v,`IF(B${r}=0,"",E${r}/B${r})`)];};
+  ING.meses.forEach((v,i)=>r3.push(fm(mesLabel(i),v,I.ant.meses[i],I.ret.meses[i])));ING.proj.forEach((v,k)=>r3.push(fm(mesLabel(ej.hasta+k)+' proy.',v,I.ant.proj[k],I.ret.proj[k])));r3.push(fm('Total',ingT,I.ant.total,I.ret.total));
+  const ws7=XLSX.utils.aoa_to_sheet(r3);ws7['!cols']=[{wch:30},{wch:18},{wch:14},{wch:14},{wch:18},{wch:14},{wch:12}];add(ws7,'Provisiones y anticipos');
   XLSX.writeFile(wb,`Precierre_${DB.empresa.rif.replace(/[^A-Z0-9]/gi,'')}_${ej.anio}.xlsx`);
 }
 
